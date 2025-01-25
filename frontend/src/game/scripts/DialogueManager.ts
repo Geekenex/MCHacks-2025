@@ -9,10 +9,11 @@ export class DialogueManager {
   private scene: Phaser.Scene;
   private lines: DialogueLine[];
   private currentLineIndex: number;
-  private dialogueBox: Phaser.GameObjects.Rectangle;
-  private dialogueText: Phaser.GameObjects.Text;
   private dialogueActive: boolean;
   private onDialogueComplete?: () => void;
+
+  private dialogueBox: Phaser.GameObjects.Graphics;
+  private dialogueText: Phaser.GameObjects.Text;
 
   constructor(
     scene: Phaser.Scene,
@@ -25,26 +26,33 @@ export class DialogueManager {
     this.currentLineIndex = 0;
     this.dialogueActive = false;
 
-    this.dialogueBox = this.scene.add
-      .rectangle(0, this.scene.scale.height - 80, this.scene.scale.width, 80, 0x000000)
-      .setOrigin(0, 0)
-      .setVisible(false);
+    this.dialogueBox = this.scene.add.graphics();
+    this.dialogueBox.setDepth(1000);
+    this.dialogueBox.setVisible(false);
 
-    this.dialogueText = this.scene.add
-      .text(20, this.scene.scale.height - 70, '', {
-        fontSize: '16px',
-        color: '#ffffff',
-        wordWrap: { width: this.scene.scale.width - 40 },
-      })
-      .setVisible(false);
+    const boxMargin = 20;
+    const boxWidth = this.scene.scale.width - boxMargin * 2;
+    const boxHeight = 80;
+    const boxX = boxMargin;
+    const boxY = this.scene.scale.height - boxHeight - boxMargin;
+
+    this.dialogueBox.fillStyle(0x000000, 0.8);
+    this.dialogueBox.fillRoundedRect(boxX, boxY, boxWidth, boxHeight, 12);
+    this.dialogueBox.lineStyle(2, 0xffffff, 1);
+    this.dialogueBox.strokeRoundedRect(boxX, boxY, boxWidth, boxHeight, 12);
+
+    this.dialogueText = this.scene.add.text(boxX + 15, boxY + 10, '', {
+      fontSize: '16px',
+      color: '#ffffff',
+      wordWrap: { width: boxWidth - 30 },
+    });
+    this.dialogueText.setDepth(1001);
+    this.dialogueText.setVisible(false);
 
     this.scene.input.on('pointerdown', () => {
       if (!this.dialogueActive) return;
-
       this.currentLineIndex++;
-
       if (this.currentLineIndex >= this.lines.length) {
-        // End of dialogue
         this.endDialogue();
       } else {
         this.dialogueText.setText(this.lines[this.currentLineIndex].text);
@@ -55,6 +63,7 @@ export class DialogueManager {
   public startDialogue() {
     this.dialogueActive = true;
     this.currentLineIndex = 0;
+
     this.dialogueBox.setVisible(true);
     this.dialogueText.setText(this.lines[this.currentLineIndex].text);
     this.dialogueText.setVisible(true);

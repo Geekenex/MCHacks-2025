@@ -23,6 +23,7 @@ export class Game extends Scene {
   dialogueManager: DialogueManager;
   currentNpc: NPCData | null = null;
   playerHP: number = 100;
+  isInCombat: boolean = false;
 
   constructor() {
     super('Game');
@@ -145,7 +146,10 @@ export class Game extends Scene {
 
     this.dialogueManager = new DialogueManager(this, lines, () => {
       if (this.currentNpc) {
-        const combatManager = new CombatManager(this, this.currentNpc, this.playerHP);
+        this.isInCombat = true;
+        const combatManager = new CombatManager(this, this.currentNpc, this.playerHP, () => {
+          this.isInCombat = false;
+        });
         combatManager.startCombat();
       }
     });
@@ -156,7 +160,7 @@ export class Game extends Scene {
   }
 
   update() {
-    if (this.dialogueManager.isDialogueActive()) {
+    if (this.dialogueManager.isDialogueActive() || this.isInCombat) {
       this.player.setVelocity(0, 0);
       return;
     }

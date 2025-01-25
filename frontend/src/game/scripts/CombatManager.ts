@@ -16,6 +16,7 @@ export class CombatManager {
   private menuTexts: Phaser.GameObjects.Text[] = [];
   private infoText: Phaser.GameObjects.Text;
   private inActionText: boolean = false;
+  private onCombatEnd: () => void;
 
   private keys: {
     up: Phaser.Input.Keyboard.Key;
@@ -23,12 +24,12 @@ export class CombatManager {
     enter: Phaser.Input.Keyboard.Key;
   };
 
-  constructor(scene: Phaser.Scene, npc: NPCData, playerHP: number) {
+  constructor(scene: Phaser.Scene, npc: NPCData, playerHP: number, onCombatEnd: () => void) {
     this.scene = scene;
     this.npc = npc;
     this.playerHP = playerHP;
+    this.onCombatEnd = onCombatEnd;
 
-    // We'll listen for these keys in handleInput
     this.keys = {
       up: this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.UP),
       down: this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN),
@@ -170,6 +171,7 @@ export class CombatManager {
       this.menuTexts.forEach(t => t.destroy());
       this.scene.events.off('update', this.handleInput, this);
       this.infoText.destroy();
+      this.onCombatEnd();
     });
   }
 
