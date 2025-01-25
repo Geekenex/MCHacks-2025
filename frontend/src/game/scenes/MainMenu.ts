@@ -2,8 +2,16 @@ import { GameObjects, Scene } from 'phaser';
 
 import { EventBus } from '../EventBus';
 
+import { GumloopClient } from "gumloop";
+
+//env vars
+import.meta.env.VITE_API_KEY;
+import.meta.env.VITE_USER_ID;
+import.meta.env.VITE_FLOW_ID;
+
 export class MainMenu extends Scene
 {
+
 
 
     background: GameObjects.Image;
@@ -50,21 +58,27 @@ export class MainMenu extends Scene
         EventBus.emit('current-scene-ready', this);
     }
     sendToAPI(input: string) {
-        fetch('https://example.com/api', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ prompt: input }),
-        })
-            .then((response) => response.json())
-            .then((data) => {
-                console.log('API Response:', data);
-                this.scene.start('Game');
-            })
-            .catch((error) => {
-                console.error('Error sending to API:', error);
-            });
+        const client = new GumloopClient({
+            apiKey: `${import.meta.env.VITE_API_KEY}`,
+            userId: `${import.meta.env.VITE_USER_ID}`,
+          });
+            // Run a flow and wait for outputs
+            async function runFlow() {
+                try {
+                  const output = await client.runFlow(`${import.meta.env.VITE_FLOW_ID}`, {
+                    recipient: "killian.hedou@gmail.com",
+                    
+                    prompt: input
+                    
+                  });
+              
+                  console.log(output);
+                } catch (error) {
+                  console.error("Flow execution failed:", error);
+                }
+              }
+              
+        runFlow();
     }
 
     
