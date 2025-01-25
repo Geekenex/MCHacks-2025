@@ -1,9 +1,13 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
+import { CombatManager } from '../CombatManager';
 
 interface NPCData {
-  sprite: Phaser.Physics.Arcade.Sprite;
-  interacted: boolean;
+    sprite: Phaser.Physics.Arcade.Sprite;
+    interacted: boolean;
+    health: number;
+    healthBar?: Phaser.GameObjects.Graphics;
+  
 }
 
 export class Game extends Scene {
@@ -20,6 +24,9 @@ export class Game extends Scene {
   dialogueActive: boolean;
   dialogueBox: Phaser.GameObjects.Rectangle;
   dialogueText: Phaser.GameObjects.Text;
+
+  currentNpc: NPCData | null = null;
+  playerHP: number = 100;
 
   constructor() {
     super('Game');
@@ -112,6 +119,7 @@ export class Game extends Scene {
       const npcData: NPCData = {
         sprite,
         interacted: false,
+        health: 100,
       };
 
       // Overlap handler for a specific NPC
@@ -158,9 +166,16 @@ export class Game extends Scene {
       if (!this.dialogueActive) return;
       this.currentLineIndex++;
       if (this.currentLineIndex >= this.dialogue.length) {
+        //end dialogue
         this.dialogueActive = false;
         this.dialogueBox.setVisible(false);
         this.dialogueText.setVisible(false);
+
+        //trigger combat with the NPC we just talked to
+        if (this.currentNpc) {
+            const combatManager = new CombatManager(this, this.currentNpc, this.playerHP);
+            combatManager.startCombat();
+        }
       } else {
         this.dialogueText.setText(this.dialogue[this.currentLineIndex].text);
       }
@@ -217,5 +232,6 @@ export class Game extends Scene {
     this.dialogueText.setVisible(true);
 
     npc.interacted = true;
+    this.currentNpc = npc;
   }
 }
