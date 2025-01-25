@@ -1,7 +1,7 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
-import { DialogueManager, DialogueLine } from '../DialogueManager';
-import { CombatManager } from '../CombatManager';
+import { DialogueManager, DialogueLine } from '../scripts/DialogueManager';
+import { CombatManager } from '../scripts/CombatManager';
 
 interface NPCData {
     sprite: Phaser.Physics.Arcade.Sprite;
@@ -161,10 +161,10 @@ export class Game extends Scene {
       return;
     }
 
-    const movingLeft = this.cursors.left?.isDown || this.wasd.left.isDown;
-    const movingRight = this.cursors.right?.isDown || this.wasd.right.isDown;
-    const movingUp = this.cursors.up?.isDown || this.wasd.up.isDown;
-    const movingDown = this.cursors.down?.isDown || this.wasd.down.isDown;
+    const movingLeft = this.wasd.left.isDown;
+    const movingRight = this.wasd.right.isDown;
+    const movingUp = this.wasd.up.isDown;
+    const movingDown = this.wasd.down.isDown;
 
     if (movingLeft && !movingRight && !movingUp && !movingDown) {
       this.player.setVelocity(-200, 0);
