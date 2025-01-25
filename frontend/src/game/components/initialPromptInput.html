@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        input {
+            width: 300px;
+            height: 40px;
+            font-size: 18px;
+            padding: 5px;   
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            outline: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        input:focus {
+            border-color: #6200ea;
+            box-shadow: 0 4px 6px rgba(98, 0, 234, 0.3);
+        }
+
+        input::placeholder {
+            color: #aaa;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div style="text-align: center;">
+        <input id="prompt-input" type="text" placeholder="Enter your theme prompt" style="padding: 10px; font-size: 16px; width: 300px;" />
+        <br />
+        <button id="start-button" style="margin-top: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer;">Start Game</button>
+    </div>
+</body>
+</html>
