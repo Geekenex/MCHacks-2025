@@ -1,5 +1,6 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
+import { DialogueManager, DialogueLine } from '../DialogueManager';
 import { CombatManager } from '../CombatManager';
 
 interface NPCData {
@@ -19,12 +20,7 @@ export class Game extends Scene {
 
   npcs: NPCData[] = [];
 
-  dialogue: { speaker: string; text: string }[];
-  currentLineIndex: number;
-  dialogueActive: boolean;
-  dialogueBox: Phaser.GameObjects.Rectangle;
-  dialogueText: Phaser.GameObjects.Text;
-
+  dialogueManager: DialogueManager;
   currentNpc: NPCData | null = null;
   playerHP: number = 100;
 
@@ -140,52 +136,27 @@ export class Game extends Scene {
       };
     }
 
-    this.dialogue = [
-      { speaker: 'Player', text: 'Hello, NPC!' },
-      { speaker: 'NPC', text: 'Hello, Player!' },
-      { speaker: 'Player', text: 'How are you today?' },
-      { speaker: 'NPC', text: 'Doing well, thanks!' },
-    ];
+    const lines: DialogueLine[] = [
+        { speaker: 'Player', text: 'Hello, NPC!' },
+        { speaker: 'NPC', text: 'Hello, Player!' },
+        { speaker: 'Player', text: 'How are you today?' },
+        { speaker: 'NPC', text: 'Doing well, thanks!' },
+      ];
 
-    this.currentLineIndex = 0;
-    this.dialogueActive = false;
-
-    this.dialogueBox = this.add
-      .rectangle(0, this.scale.height - 80, this.scale.width, 80, 0x000000, 1)
-      .setOrigin(0, 0);
-    this.dialogueBox.setVisible(false);
-
-    this.dialogueText = this.add.text(20, this.scale.height - 70, '', {
-      fontSize: '16px',
-      color: '#ffffff',
-      wordWrap: { width: this.scale.width - 40 },
-    });
-    this.dialogueText.setVisible(false);
-
-    this.input.on('pointerdown', () => {
-      if (!this.dialogueActive) return;
-      this.currentLineIndex++;
-      if (this.currentLineIndex >= this.dialogue.length) {
-        //end dialogue
-        this.dialogueActive = false;
-        this.dialogueBox.setVisible(false);
-        this.dialogueText.setVisible(false);
-
-        //trigger combat with the NPC we just talked to
-        if (this.currentNpc) {
-            const combatManager = new CombatManager(this, this.currentNpc, this.playerHP);
-            combatManager.startCombat();
-        }
-      } else {
-        this.dialogueText.setText(this.dialogue[this.currentLineIndex].text);
+    this.dialogueManager = new DialogueManager(this, lines, () => {
+      if (this.currentNpc) {
+        const combatManager = new CombatManager(this, this.currentNpc, this.playerHP);
+        combatManager.startCombat();
       }
     });
+
+
 
     EventBus.emit('current-scene-ready', this);
   }
 
   update() {
-    if (this.dialogueActive) {
+    if (this.dialogueManager.isDialogueActive()) {
       this.player.setVelocity(0, 0);
       return;
     }
@@ -222,16 +193,13 @@ export class Game extends Scene {
     }
   }
 
-  private handleNpcOverlap(npc: NPCData) {
-    if (npc.interacted || this.dialogueActive) return;
 
-    this.dialogueActive = true;
-    this.currentLineIndex = 0;
-    this.dialogueBox.setVisible(true);
-    this.dialogueText.setText(this.dialogue[this.currentLineIndex].text);
-    this.dialogueText.setVisible(true);
+  private handleNpcOverlap(npc: NPCData) {
+    if (npc.interacted || this.dialogueManager.isDialogueActive()) return;
 
     npc.interacted = true;
     this.currentNpc = npc;
+
+    this.dialogueManager.startDialogue();
   }
 }
