@@ -1,16 +1,24 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 
+interface NPCData {
+  sprite: Phaser.Physics.Arcade.Sprite;
+  interacted: boolean;
+}
+
 export class Game extends Scene {
   camera: Phaser.Cameras.Scene2D.Camera;
   background: Phaser.GameObjects.Image;
   player: Phaser.Physics.Arcade.Sprite;
-  npc: Phaser.Physics.Arcade.Sprite;
   cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   wasd: { up: Phaser.Input.Keyboard.Key; down: Phaser.Input.Keyboard.Key; left: Phaser.Input.Keyboard.Key; right: Phaser.Input.Keyboard.Key };
+
+  npcs: NPCData[] = [];
+
   dialogue: { speaker: string; text: string }[];
   currentLineIndex: number;
   dialogueActive: boolean;
+  dialogueBox: Phaser.GameObjects.Rectangle;
   dialogueText: Phaser.GameObjects.Text;
 
   constructor() {
@@ -87,16 +95,32 @@ export class Game extends Scene {
     this.player.setCollideWorldBounds(true);
     this.player.play('idle-down');
 
-    this.npc = this.physics.add.sprite(400, 256, 'npc');
-    this.npc.setImmovable(true);
-    if (this.npc.body) {
-      this.npc.body.setSize(64, 64);
-    }
-    if (this.npc.body) {
-      this.npc.body.setOffset(224, 224);
-    }
+    const npcPositions = [
+      { x: 400, y: 256 },
+      { x: 500, y: 300 },
+      { x: 600, y: 256 },
+    ];
 
-    this.physics.add.overlap(this.player, this.npc, this.handleDialogue, undefined, this);
+    npcPositions.forEach(pos => {
+      const sprite = this.physics.add.sprite(pos.x, pos.y, 'npc');
+      sprite.setOrigin(0.5, 0.5);
+      sprite.setImmovable(true);
+      sprite.setScale(0.2);
+      if (sprite.body) {
+        sprite.body.setSize(32, 32);
+      }
+      const npcData: NPCData = {
+        sprite,
+        interacted: false,
+      };
+
+      // Overlap handler for a specific NPC
+      this.physics.add.overlap(this.player, sprite, () => {
+        this.handleNpcOverlap(npcData);
+      });
+
+      this.npcs.push(npcData);
+    });
 
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
@@ -108,7 +132,6 @@ export class Game extends Scene {
       };
     }
 
-    //TODO: fetch from gumloop api for dialogue
     this.dialogue = [
       { speaker: 'Player', text: 'Hello, NPC!' },
       { speaker: 'NPC', text: 'Hello, Player!' },
@@ -118,7 +141,17 @@ export class Game extends Scene {
 
     this.currentLineIndex = 0;
     this.dialogueActive = false;
-    this.dialogueText = this.add.text(100, 100, '', { fontSize: '16px', color: '#ffffff' });
+
+    this.dialogueBox = this.add
+      .rectangle(0, this.scale.height - 80, this.scale.width, 80, 0x000000, 1)
+      .setOrigin(0, 0);
+    this.dialogueBox.setVisible(false);
+
+    this.dialogueText = this.add.text(20, this.scale.height - 70, '', {
+      fontSize: '16px',
+      color: '#ffffff',
+      wordWrap: { width: this.scale.width - 40 },
+    });
     this.dialogueText.setVisible(false);
 
     this.input.on('pointerdown', () => {
@@ -126,6 +159,7 @@ export class Game extends Scene {
       this.currentLineIndex++;
       if (this.currentLineIndex >= this.dialogue.length) {
         this.dialogueActive = false;
+        this.dialogueBox.setVisible(false);
         this.dialogueText.setVisible(false);
       } else {
         this.dialogueText.setText(this.dialogue[this.currentLineIndex].text);
@@ -136,6 +170,11 @@ export class Game extends Scene {
   }
 
   update() {
+    if (this.dialogueActive) {
+      this.player.setVelocity(0, 0);
+      return;
+    }
+
     const movingLeft = this.cursors.left?.isDown || this.wasd.left.isDown;
     const movingRight = this.cursors.right?.isDown || this.wasd.right.isDown;
     const movingUp = this.cursors.up?.isDown || this.wasd.up.isDown;
@@ -168,12 +207,15 @@ export class Game extends Scene {
     }
   }
 
-  private handleDialogue() {
-    if (!this.dialogueActive) {
-      this.dialogueActive = true;
-      this.currentLineIndex = 0;
-      this.dialogueText.setText(this.dialogue[this.currentLineIndex].text);
-      this.dialogueText.setVisible(true);
-    }
+  private handleNpcOverlap(npc: NPCData) {
+    if (npc.interacted || this.dialogueActive) return;
+
+    this.dialogueActive = true;
+    this.currentLineIndex = 0;
+    this.dialogueBox.setVisible(true);
+    this.dialogueText.setText(this.dialogue[this.currentLineIndex].text);
+    this.dialogueText.setVisible(true);
+
+    npc.interacted = true;
   }
 }
