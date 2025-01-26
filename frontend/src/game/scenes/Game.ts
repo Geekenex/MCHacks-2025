@@ -73,6 +73,7 @@ export class Game extends Scene {
             this.inputPrompt = data.input;
         }
 
+
         // Handle Defeated NPCs
         if (data.npcWasKilled && data.npcIndexToRemove !== undefined) {
             const npcIdToRemove = data.npcIndexToRemove;
@@ -101,7 +102,12 @@ export class Game extends Scene {
     }
 
     preload() {
-        this.load.spritesheet('player', 'assets/player.png', { frameWidth: 256, frameHeight: 256 });
+        console.log("preload")
+
+        
+
+        //this.load.spritesheet('player', 'assets/player.png', { frameWidth: 256, frameHeight: 256 });
+        
         this.load.spritesheet('npc', 'assets/npc.png', { frameWidth: 512, frameHeight: 512 });
         this.load.image('background1', 'assets/background1.png');
     }
@@ -157,6 +163,25 @@ export class Game extends Scene {
         });
     }
 
+    async generateSprite() {
+        const client = new GumloopClient({
+            apiKey: `${import.meta.env.VITE_SPRITE_API_KEY}`,
+            userId: `${import.meta.env.VITE_SPRITE_USER_ID}`,
+        });
+    
+        // Run a flow and wait for outputs
+        try {
+            const sprite = await client.runFlow(`${import.meta.env.VITE_SPRITE_FLOW_ID}`, {
+                prompt: this.inputPrompt,
+            });
+            console.log(sprite.output)
+            return String(sprite.output); // Return the sprite output
+        } catch (error) {
+            console.error("Flow execution failed:", error);
+            throw error; // Rethrow the error to allow handling by the caller
+        }
+    }
+
     create() {
         this.handleAnimations();
 
@@ -165,7 +190,7 @@ export class Game extends Scene {
         const startY = Game.playerPosition.y;
 
         this.player = this.physics.add.sprite(startX, startY, 'player');
-        this.player.setScale(0.5);
+        this.player.setScale(1);
         this.player.setCollideWorldBounds(true);
         this.player.play('idle-down');
         this.physics.world.enable(this.player);
@@ -520,49 +545,49 @@ private spawnNPCs(numberOfNPCs: number): void {
 
         this.anims.create({
             key: 'down',
-            frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
+            frames: this.anims.generateFrameNumbers('player', { start: 130, end: 139 }),
             frameRate: 10,
             repeat: -1,
         });
         this.anims.create({
             key: 'left',
-            frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
+            frames: this.anims.generateFrameNumbers('player', { start: 117, end: 126 }),
             frameRate: 10,
             repeat: -1,
         });
         this.anims.create({
             key: 'right',
-            frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
+            frames: this.anims.generateFrameNumbers('player', { start: 143, end: 152 }),
             frameRate: 10,
             repeat: -1,
         });
         this.anims.create({
             key: 'up',
-            frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
+            frames: this.anims.generateFrameNumbers('player', { start: 104, end: 113 }),
             frameRate: 10,
             repeat: -1,
         });
         this.anims.create({
             key: 'idle-down',
-            frames: [{ key: 'player', frame: 1 }],
+            frames: [{ key: 'player', frame: 26 }],
             frameRate: 1,
             repeat: -1,
         });
         this.anims.create({
             key: 'idle-left',
-            frames: [{ key: 'player', frame: 5 }],
+            frames: [{ key: 'player', frame: 13 }],
             frameRate: 1,
             repeat: -1,
         });
         this.anims.create({
             key: 'idle-right',
-            frames: [{ key: 'player', frame: 9 }],
+            frames: [{ key: 'player', frame: 39 }],
             frameRate: 1,
             repeat: -1,
         });
         this.anims.create({
             key: 'idle-up',
-            frames: [{ key: 'player', frame: 13 }],
+            frames: [{ key: 'player', frame: 0 }],
             frameRate: 1,
             repeat: -1,
         });
