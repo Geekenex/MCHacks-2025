@@ -2,6 +2,7 @@ import { Boot } from './scenes/Boot';
 import { GameOver } from './scenes/GameOver';
 import { Game as MainGame } from './scenes/Game';
 import { MainMenu } from './scenes/MainMenu';
+import { CombatScene } from './scenes/CombatScene';
 import { AUTO, Game } from 'phaser';
 import { Preloader } from './scenes/Preloader';
 
@@ -16,12 +17,20 @@ const config: Phaser.Types.Core.GameConfig = {
     },
     parent: 'game-container',
     backgroundColor: '#028af8',
+    physics: {
+        default: 'arcade', // Enable Arcade Physics
+        arcade: {
+            gravity: { x: 0, y: 0 }, // No gravity for a top-down game
+            debug: false,      // Set to true if you want to see collision boxes
+        },
+    },
     scene: [
         Boot,
         Preloader,
         MainMenu,
         MainGame,
-        GameOver
+        GameOver,
+        CombatScene
     ]
 };
 
