@@ -138,8 +138,8 @@ export class CombatManager {
 
     switch (selectedAction.type) {
       case 'offense':
-        this.playerHP -= 15;
-        actionLog = `Enemy used ${selectedAction.name} and dealt 15 damage!`;
+        this.playerHP -= 10;
+        actionLog = `Enemy used ${selectedAction.name} and dealt 10 damage!`;
         break;
       case 'defense':
         this.npc.health += 10;
@@ -153,8 +153,8 @@ export class CombatManager {
           actionLog = `Enemy used ${selectedAction.name} but missed!`;
           break;
         } else {
-          this.playerHP -= 25;
-          actionLog = `Enemy used ${selectedAction.name} and dealt 25 damage!`;
+          this.playerHP -= 15;
+          actionLog = `Enemy used ${selectedAction.name} and dealt 15 damage!`;
           break;
         }
     }

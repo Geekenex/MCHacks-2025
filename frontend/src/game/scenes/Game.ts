@@ -181,7 +181,9 @@ export class Game extends Scene {
         this.player = this.physics.add.sprite(startX, startY, 'player');
         this.player.setScale(0.5);
         this.player.setCollideWorldBounds(true);
+        this.player.setVisible(true);
         this.player.play('idle-down');
+        this.player.setDepth(1);
         this.physics.world.enable(this.player);
         if (this.player.body) {
             this.player.setCollideWorldBounds(true, 0, 0, true);
@@ -236,6 +238,27 @@ export class Game extends Scene {
         });
         this.dialogueText.setVisible(false);
 
+        // init background texture
+        const currentMapTextureKey = WorldManager.maps.currentMap;
+
+        // Ensure the texture is loaded before using it
+        if (!this.textures.exists(currentMapTextureKey)) {
+            const image = new Image();
+            image.src = `data:image/png;base64,${currentMapTextureKey}`;
+            image.onload = () => {
+                this.textures.addImage(currentMapTextureKey, image);
+                this.background.setTexture(currentMapTextureKey); // Set the background texture here
+            };
+        } else {
+            this.background = this.add.image(
+                this.scale.width / 2,
+                this.scale.height / 2,
+                currentMapTextureKey
+            ).setAlpha(1).setDepth(-1);
+        }
+
+
+        
         EventBus.emit('current-scene-ready', this);
         
     }
@@ -620,55 +643,63 @@ private spawnNPCs(numberOfNPCs: number): void {
         this.camera = this.cameras.main;
         this.camera.setBackgroundColor(0);
         console.log(WorldManager.maps.currentMap);
-        this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, WorldManager.maps.currentMap).setAlpha(1);
+        this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, WorldManager.maps.currentMap).setAlpha(1).setDepth(-1);
+        const animations = [
+            {
+                key: 'down',
+                frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
+                frameRate: 10,
+                repeat: -1,
+            },
+            {
+                key: 'left',
+                frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
+                frameRate: 10,
+                repeat: -1,
+            },
+            {
+                key: 'right',
+                frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
+                frameRate: 10,
+                repeat: -1,
+            },
+            {
+                key: 'up',
+                frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
+                frameRate: 10,
+                repeat: -1,
+            },
+            {
+                key: 'idle-down',
+                frames: [{ key: 'player', frame: 1 }],
+                frameRate: 1,
+                repeat: -1,
+            },
+            {
+                key: 'idle-left',
+                frames: [{ key: 'player', frame: 5 }],
+                frameRate: 1,
+                repeat: -1,
+            },
+            {
+                key: 'idle-right',
+                frames: [{ key: 'player', frame: 9 }],
+                frameRate: 1,
+                repeat: -1,
+            },
+            {
+                key: 'idle-up',
+                frames: [{ key: 'player', frame: 13 }],
+                frameRate: 1,
+                repeat: -1,
+            },
+        ];
+    
+        animations.forEach(({ key, frames, frameRate, repeat }) => {
+            if (!this.anims.exists(key)) {
+                this.anims.create({ key, frames, frameRate, repeat });
+            }
+        });
 
-        this.anims.create({
-            key: 'down',
-            frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'left',
-            frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'right',
-            frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'up',
-            frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'idle-down',
-            frames: [{ key: 'player', frame: 1 }],
-            frameRate: 1,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'idle-left',
-            frames: [{ key: 'player', frame: 5 }],
-            frameRate: 1,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'idle-right',
-            frames: [{ key: 'player', frame: 9 }],
-            frameRate: 1,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'idle-up',
-            frames: [{ key: 'player', frame: 13 }],
-            frameRate: 1,
-            repeat: -1,
-        });
     }
 }
