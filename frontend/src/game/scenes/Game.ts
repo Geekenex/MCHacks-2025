@@ -21,6 +21,7 @@ interface GameInitData {
     npcWasKilled?: boolean;
     input?: string;
     playerPosition?: { x: number; y: number }; 
+    playerBase64?: string;
 }
 
 export class Game extends Scene {
@@ -59,6 +60,26 @@ export class Game extends Scene {
         super('Game');
     }
 
+    private loadPlayerBase64(base64: string) {
+        // 1. Create an HTML Image from the base64
+        const image = new Image();
+        image.src = base64; // must be "data:image/png;base64,...."
+    
+        image.onload = () => {
+            // 2. Add it as a spritesheet in Phaser
+            this.textures.addSpriteSheet('player', image, {
+                frameWidth: 64,
+                frameHeight: 64
+            });
+    
+            
+        };
+    
+        image.onerror = (err) => {
+            console.error('Error loading base64 player sprite:', err);
+        };
+    }
+
     init(data: GameInitData) {
         console.log(`Game scene init with data:`, data);
 
@@ -69,6 +90,9 @@ export class Game extends Scene {
         }
 
         this.isInCombat = false;
+        if (data.playerBase64) {
+            this.loadPlayerBase64(data.playerBase64);
+        }
 
         if (data.input) {
             console.log(`Received input from MainMenu: ${data.input}`);
@@ -104,7 +128,7 @@ export class Game extends Scene {
     }
 
     preload() {
-        this.load.spritesheet('player', 'assets/player2.png', { frameWidth: 64, frameHeight: 64 });
+        //this.load.spritesheet('player', 'assets/player2.png', { frameWidth: 64, frameHeight: 64 });
         this.load.spritesheet('npc', 'assets/npc.png', { frameWidth: 512, frameHeight: 512 });
     }
 

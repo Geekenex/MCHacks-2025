@@ -23,6 +23,7 @@ export class MainMenu extends Scene
     {
         super('MainMenu');
     }
+    
 
     async create ()
     {
@@ -58,9 +59,9 @@ export class MainMenu extends Scene
                         alert('Failed to load the sprite. Please try again.');
                         return;
                     }
-                    await Promise.all([
-                        WorldManager.init(input),
-                    ]);
+                    //await Promise.all([
+                     //   WorldManager.init(input),
+                   // ]);
                     
                     this.background = this.add.image(512, 384, this.textures.get(WorldManager.maps.currentMap));
 
@@ -77,13 +78,15 @@ export class MainMenu extends Scene
     
     changeScene (input: String)
     {
+
+        const playerSpriteBase64 = SpriteManager.getSprite()
         if (this.logoTween)
         {
             this.logoTween.stop();
             this.logoTween = null;
         }
 
-        this.scene.start('Game', { input });
+        this.scene.start('Game', { input, playerBase64: playerSpriteBase64 });
         this.backgroundMusic.stop();
         this.sound.add('game_start').play();
     }
