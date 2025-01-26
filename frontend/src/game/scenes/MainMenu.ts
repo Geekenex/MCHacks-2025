@@ -2,7 +2,6 @@ import { GameObjects, Scene } from 'phaser';
 
 import { EventBus } from '../EventBus';
 
-import { GumloopClient } from "gumloop";
 
 //env vars
 import.meta.env.VITE_API_KEY;
@@ -54,32 +53,6 @@ export class MainMenu extends Scene
 
         EventBus.emit('current-scene-ready', this);
     }
-    // sendToAPI(input: string) {
-    //     const client = new GumloopClient({
-    //         apiKey: `${import.meta.env.VITE_API_KEY}`,
-    //         userId: `${import.meta.env.VITE_USER_ID}`,
-    //       });
-    //         // Run a flow and wait for outputs
-    //         async function runFlow() {
-    //             try {
-    //               const output = await client.runFlow(`${import.meta.env.VITE_FLOW_ID}`, {
-    //                 recipient: "killian.hedou@gmail.com",
-                    
-    //                 prompt: input
-                    
-    //               });
-              
-    //               console.log(output);
-    //             } catch (error) {
-    //               console.error("Flow execution failed:", error);
-    //             }
-    //           }
-              
-    //     // runFlow();
-    //     //navigate to game scene
-    //     // this.changeScene();
-    // }
-
     
     changeScene (input: String)
     {
