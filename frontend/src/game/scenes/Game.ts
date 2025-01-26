@@ -17,18 +17,18 @@ interface NPCData {
 
 interface GameInitData {
     playerHP?: number;
-    npcIndexToRemove?: number; 
+    npcIndexToRemove?: number;
     npcWasKilled?: boolean;
     input?: string;
-    playerPosition?: { x: number; y: number }; 
+    playerPosition?: { x: number; y: number };
 }
 
 export class Game extends Scene {
-    static nextNpcId: number = 0; 
-    static defeatedNpcIds: number[] = []; 
-    static npcsState: NPCData[] = []; 
+    static nextNpcId: number = 0;
+    static defeatedNpcIds: number[] = [];
+    static npcsState: NPCData[] = [];
     static playerPosition: { x: number; y: number } = { x: 256, y: 256 };
-    static playerHP: number = 100; 
+    static playerHP: number = 100;
 
     camera: Phaser.Cameras.Scene2D.Camera;
     background: Phaser.GameObjects.Image;
@@ -40,9 +40,6 @@ export class Game extends Scene {
     currentNpc: NPCData | null = null;
     playerHPInstance: number = 100;
     isInCombat: boolean = false;
-    dialogue: { speaker: string; text: string }[] = [];
-    currentLineIndex: number;
-    dialogueActive: boolean;
     dialogueLines: DialogueLine[] = [];
     dialogueBox: Phaser.GameObjects.Rectangle;
     dialogueText: Phaser.GameObjects.Text;
@@ -71,29 +68,16 @@ export class Game extends Scene {
             console.log(`Received input from MainMenu: ${data.input}`);
             this.generateNewDialogue(data.input);
             this.inputPrompt = data.input;
+
+            this.generateSprite().catch((error) => {
+                console.error("Failed to generate sprite:", error);
+            });
         }
 
-        // Handle Defeated NPCs
         if (data.npcWasKilled && data.npcIndexToRemove !== undefined) {
-            const npcIdToRemove = data.npcIndexToRemove;
-            const npcToRemoveIndex = Game.npcsState.findIndex(npc => npc.id === npcIdToRemove);
-            if (npcToRemoveIndex !== -1) {
-                Game.npcsState.splice(npcToRemoveIndex, 1);
-                Game.defeatedNpcIds.push(npcIdToRemove);
-                console.log(`NPC with ID ${npcIdToRemove} marked as defeated and removed from state.`);
-
-                // Additionally, find and destroy the sprite if it exists
-                const npcToRemove = this.npcs.find(npc => npc.id === npcIdToRemove);
-                if (npcToRemove && npcToRemove.sprite) {
-                    npcToRemove.sprite.destroy();
-                    console.log(`NPC sprite with ID ${npcIdToRemove} destroyed.`);
-                }
-            } else {
-                console.warn(`No NPC found with ID ${npcIdToRemove} in state.`);
-            }
+            this.handleNpcRemoval(data.npcIndexToRemove);
         }
 
-        // Update Player Position if provided
         if (data.playerPosition) {
             Game.playerPosition = data.playerPosition;
             console.log(`Player position set to: (${Game.playerPosition.x}, ${Game.playerPosition.y})`);
@@ -106,7 +90,81 @@ export class Game extends Scene {
         this.load.image('background1', 'assets/background1.png');
     }
 
-    generateNewDialogue(input: String)  {
+    async generateSprite(): Promise<void> {
+        const client = new GumloopClient({
+            apiKey: `${import.meta.env.VITE_SPRITE_API_KEY}`,
+            userId: `${import.meta.env.VITE_SPRITE_USER_ID}`,
+        });
+
+        try {
+            const sprite = await client.runFlow(`${import.meta.env.VITE_SPRITE_FLOW_ID}`, {
+                prompt: this.inputPrompt,
+            });
+
+            const base64Image = String(sprite.output);
+            console.log("Generated sprite (Base64):", base64Image.slice(0, 100), "..."); // Log only the first 100 chars
+
+            if (base64Image) {
+                this.loadBase64Texture('playerTexture', base64Image);
+            } else {
+                console.error("Generated sprite is empty or invalid.");
+            }
+        } catch (error) {
+            console.error("Failed to generate sprite:", error);
+        }
+    }
+
+    loadBase64Texture(key: string, base64Data: string): void {
+        try {
+            const image = new Image();
+            image.src = `data:image/png;base64,${base64Data}`;
+            image.onload = () => {
+                this.textures.addImage(key, image);
+                console.log(`Texture "${key}" successfully loaded from Base64.`);
+                this.initializePlayerWithBase64Texture();
+            };
+        } catch (error) {
+            console.error(`Failed to add texture "${key}":`, error);
+        }
+    }
+
+    initializePlayerWithBase64Texture(): void {
+        if (this.textures.exists('playerTexture')) {
+            this.player = this.physics.add.sprite(400, 300, 'playerTexture');
+            this.player.setScale(0.5);
+            this.player.setCollideWorldBounds(true);
+            console.log('Player sprite initialized with Base64 texture.');
+        } else {
+            console.error('Texture "playerTexture" not found. Using fallback texture.');
+            this.initializePlayerWithFallback();
+        }
+    }
+
+    private initializePlayerWithFallback(): void {
+        this.player = this.physics.add.sprite(Game.playerPosition.x, Game.playerPosition.y, 'player');
+        this.player.setScale(0.5);
+        this.player.setCollideWorldBounds(true);
+        this.player.play('idle-down');
+    }
+
+    private handleNpcRemoval(npcIdToRemove: number): void {
+        const npcToRemoveIndex = Game.npcsState.findIndex(npc => npc.id === npcIdToRemove);
+        if (npcToRemoveIndex !== -1) {
+            Game.npcsState.splice(npcToRemoveIndex, 1);
+            Game.defeatedNpcIds.push(npcIdToRemove);
+            console.log(`NPC with ID ${npcIdToRemove} marked as defeated and removed from state.`);
+
+            const npcToRemove = this.npcs.find(npc => npc.id === npcIdToRemove);
+            if (npcToRemove?.sprite) {
+                npcToRemove.sprite.destroy();
+                console.log(`NPC sprite with ID ${npcIdToRemove} destroyed.`);
+            }
+        } else {
+            console.warn(`No NPC found with ID ${npcIdToRemove} in state.`);
+        }
+    }
+
+    generateNewDialogue(input: String): void {
         const client = new GumloopClient({
             apiKey: `${import.meta.env.VITE_API_KEY}`,
             userId: `${import.meta.env.VITE_USER_ID}`,
@@ -123,9 +181,8 @@ export class Game extends Scene {
                 const jsonEnd = responseString.indexOf('\n```', jsonStart);
                 const jsonString = responseString.slice(jsonStart, jsonEnd);
 
-                const dialogueLines: DialogueLine[] = JSON.parse(jsonString);
-                console.log('Dialogue lines:', dialogueLines);
-                this.dialogueLines = dialogueLines;
+                this.dialogueLines = JSON.parse(jsonString);
+                console.log('Dialogue lines:', this.dialogueLines);
             } catch (error) {
                 console.error("Failed to generate dialogue:", error);
             }
@@ -134,7 +191,7 @@ export class Game extends Scene {
         runFlow();
     }
 
-    updateDialogue() {
+    updateDialogue(): void {
         this.dialogueManager = new DialogueManager(this, this.dialogueLines, () => {
             if (this.currentNpc) {
                 this.isInCombat = true;
@@ -144,11 +201,11 @@ export class Game extends Scene {
                 this.time.delayedCall(3000, () => {
                     this.scene.start('CombatScene', {
                         playerHP: this.playerHPInstance,
-                        npcIndex: this.currentNpc!.id, // Pass NPC ID
+                        npcIndex: this.currentNpc ? this.currentNpc.id : -1,
                         npcWasKilled: true,
-                        npcData: { health: this.currentNpc!.health },
+                        npcData: { health: this.currentNpc?.health ?? 0 },
                         prompt: this.inputPrompt,
-                        playerPosition: { x: this.player.x, y: this.player.y } 
+                        playerPosition: { x: this.player.x, y: this.player.y },
                     });
                 });
 
@@ -157,57 +214,16 @@ export class Game extends Scene {
         });
     }
 
-    create() {
+    create(): void {
         this.handleAnimations();
 
-        // Initialize player at provided position or default
-        const startX = Game.playerPosition.x;
-        const startY = Game.playerPosition.y;
-
-        this.player = this.physics.add.sprite(startX, startY, 'player');
-        this.player.setScale(0.5);
-        this.player.setCollideWorldBounds(true);
-        this.player.play('idle-down');
-        this.physics.world.enable(this.player);
-        if (this.player.body) {
-            this.player.setCollideWorldBounds(true, 0, 0, true);
-            const newBodyWidth = 128;
-            const newBodyHeight = 128;
-            this.player.body.setSize(newBodyWidth, newBodyHeight);
-            this.player.body.setOffset((256 - newBodyWidth) / 2, (256 - newBodyHeight) / 2);
-        }
-
-        // Handle World Bounds for Transitions
-        this.physics.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body, up: boolean, down: boolean, left: boolean, right: boolean) => {
-            if (body.gameObject === this.player) {
-                this.handleTransition(up, down, left, right);
-            }
-        });
-
-        // Clear existing NPCs before creating new ones
-        this.clearAllNPCs();
-
-        // Initialize NPCs based on current state
-        if (Game.npcsState.length === 0) {
-            // If no NPCs in state, spawn initial NPCs
-            const initialNumberOfNPCs = Phaser.Math.Between(1, 5);
-            console.log(`Spawning initial ${initialNumberOfNPCs} NPC(s).`);
-            this.spawnInitialNPCs(initialNumberOfNPCs);
+        if (this.textures.exists('playerTexture')) {
+            this.initializePlayerWithBase64Texture();
         } else {
-            // Create NPCs from existing state
-            console.log(`Creating NPCs from saved state.`);
-            this.createNPCsFromState();
-        }
-
-        // Initialize Input Controls
-        if (this.input.keyboard) {
-            this.cursors = this.input.keyboard.createCursorKeys();
-            this.wasd = {
-                up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-                down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-                left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-                right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-            };
+            this.generateSprite().catch((error) => {
+                console.error("Failed to load player sprite:", error);
+                this.initializePlayerWithFallback();
+            });
         }
 
         this.updateDialogue();
@@ -225,296 +241,48 @@ export class Game extends Scene {
         EventBus.emit('current-scene-ready', this);
     }
 
-    update() {
+    update(): void {
         if (this.dialogueManager.isDialogueActive() || this.isInCombat) {
             this.player.setVelocity(0, 0);
             return;
         }
 
-        const movingLeft = this.wasd.left.isDown;
-        const movingRight = this.wasd.right.isDown;
-        const movingUp = this.wasd.up.isDown;
-        const movingDown = this.wasd.down.isDown;
-
-        if (movingLeft && !movingRight && !movingUp && !movingDown) {
-            this.player.setVelocity(-200, 0);
-            this.player.play('left', true);
-        } else if (movingRight && !movingLeft && !movingUp && !movingDown) {
-            this.player.setVelocity(200, 0);
-            this.player.play('right', true);
-        } else if (movingUp && !movingDown && !movingLeft && !movingRight) {
-            this.player.setVelocity(0, -200);
-            this.player.play('up', true);
-        } else if (movingDown && !movingUp && !movingLeft && !movingRight) {
-            this.player.setVelocity(0, 200);
-            this.player.play('down', true);
-        } else {
-            this.player.setVelocity(0, 0);
-            const currentAnimation = this.player.anims.currentAnim?.key;
-            if (currentAnimation === 'left') {
-                this.player.play('idle-left');
-            } else if (currentAnimation === 'right') {
-                this.player.play('idle-right');
-            } else if (currentAnimation === 'up') {
-                this.player.play('idle-up');
-            } else if (currentAnimation === 'down') {
-                this.player.play('idle-down');
+        if (this.wasd) {
+            const { left, right, up, down } = this.wasd;
+            if (left.isDown && !right.isDown && !up.isDown && !down.isDown) {
+                this.player.setVelocity(-200, 0);
+                this.player.play('left', true);
+            } else if (right.isDown && !left.isDown && !up.isDown && !down.isDown) {
+                this.player.setVelocity(200, 0);
+                this.player.play('right', true);
+            } else if (up.isDown && !down.isDown && !left.isDown && !right.isDown) {
+                this.player.setVelocity(0, -200);
+                this.player.play('up', true);
+            } else if (down.isDown && !up.isDown && !left.isDown && !right.isDown) {
+                this.player.setVelocity(0, 200);
+                this.player.play('down', true);
+            } else {
+                this.player.setVelocity(0, 0);
+                this.handleIdleAnimations();
             }
+        }
+
+    }
+
+    private handleIdleAnimations(): void {
+        const currentAnimation = this.player.anims.currentAnim?.key;
+        if (currentAnimation === 'left') {
+            this.player.play('idle-left');
+        } else if (currentAnimation === 'right') {
+            this.player.play('idle-right');
+        } else if (currentAnimation === 'up') {
+            this.player.play('idle-up');
+        } else if (currentAnimation === 'down') {
+            this.player.play('idle-down');
         }
     }
 
-    /**
-     * Generates a random position within the game bounds, ensuring it's outside the buffer zone around the player.
-     */
-    private getRandomPosition(buffer: number = this.npcSpawnBuffer): {x: number, y: number} {
-        const maxAttempts = 100;
-        let attempts = 0;
-        let position: {x: number, y: number};
-
-        do {
-            const x = Phaser.Math.Between(50, this.scale.width - 50);
-            const y = Phaser.Math.Between(50, this.scale.height - 50);
-            const distance = Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y);
-
-            if (distance >= buffer) {
-                position = { x, y };
-                // Optionally, check for overlap with other NPCs
-                const overlapping = this.npcs.some(npc => {
-                    return Phaser.Math.Distance.Between(x, y, npc.x, npc.y) < 50;
-                });
-                if (!overlapping) {
-                    return position;
-                }
-            }
-
-            attempts++;
-            if (attempts > maxAttempts) {
-                console.warn("Max attempts reached while generating NPC position.");
-                break;
-            }
-        } while (true);
-
-        return { x: this.player.x + buffer + 10, y: this.player.y + buffer + 10 };
-    }
-
-    /**
-     * Spawns initial NPCs and updates the static npcsState.
-     * @param numberOfNPCs - The number of NPCs to spawn initially.
-     */
-    private spawnInitialNPCs(numberOfNPCs: number) {
-        for (let i = 0; i < numberOfNPCs; i++) {
-            const npcId = Game.nextNpcId++;
-            const newPos = this.getRandomPosition();
-            const sprite = this.physics.add.sprite(newPos.x, newPos.y, 'npc');
-            sprite.setOrigin(0.5, 0.5);
-            sprite.setImmovable(true);
-            sprite.setScale(0.2);
-            if (sprite.body) {
-                sprite.body.setSize(32, 32);
-            }
-
-            const npcData: NPCData = {
-                id: npcId,
-                x: newPos.x,
-                y: newPos.y,
-                sprite,
-                interacted: false,
-                health: 100,
-                defeated: false,
-            };
-
-            this.physics.add.overlap(this.player, sprite, () => {
-                this.handleNpcOverlap(npcData);
-            });
-
-            this.npcs.push(npcData);
-            Game.npcsState.push(npcData);
-        }
-
-        console.log(`Spawned ${this.npcs.length} initial NPC(s).`);
-    }
-
-    /**
-     * Creates NPC sprites based on the static npcsState.
-     */
-    private createNPCsFromState() {
-        Game.npcsState.forEach(npcData => {
-          console.log(npcData);
-            if (npcData.defeated) return; // Skip defeated NPCs
-
-            const sprite = this.physics.add.sprite(npcData.x, npcData.y, 'npc');
-            sprite.setOrigin(0.5, 0.5);
-            sprite.setImmovable(true);
-            sprite.setScale(0.2);
-            if (sprite.body) {
-                sprite.body.setSize(32, 32);
-            }
-
-            this.physics.add.overlap(this.player, sprite, () => {
-                this.handleNpcOverlap(npcData);
-            });
-
-            npcData.sprite = sprite;
-            this.npcs.push(npcData);
-        });
-
-        console.log(`Created ${this.npcs.length} NPC(s) from state.`);
-    }
-/**
- * Spawns a specified number of NPCs with random positions, avoiding the player's starting area.
- * @param numberOfNPCs - The number of NPCs to spawn.
- */
-private spawnNPCs(numberOfNPCs: number): void {
-  for (let i = 0; i < numberOfNPCs; i++) {
-      // Assign unique IDs using the static counter
-      const npcId = Game.nextNpcId++;
-
-      // Skip spawning if the NPC ID is in the defeated list
-      if (Game.defeatedNpcIds.includes(npcId)) {
-          console.log(`NPC ID ${npcId} is defeated. Skipping spawn.`);
-          continue;
-      }
-
-      const newPos = this.getRandomPosition();
-      const sprite = this.physics.add.sprite(newPos.x, newPos.y, 'npc');
-      sprite.setOrigin(0.5, 0.5);
-      sprite.setImmovable(true);
-      sprite.setScale(0.2);
-      if (sprite.body) {
-          sprite.body.setSize(32, 32);
-      }
-
-      const npcData: NPCData = {
-          id: npcId,
-          x: newPos.x,
-          y: newPos.y,
-          sprite,
-          interacted: false,
-          health: 100,
-          defeated: false,
-      };
-
-      this.physics.add.overlap(this.player, sprite, () => {
-          this.handleNpcOverlap(npcData);
-      });
-
-      this.npcs.push(npcData);
-      Game.npcsState.push(npcData);
-  }
-
-  console.log(`Spawned ${this.npcs.length} NPC(s) on the screen.`);
-}
-
-    /**
-     * Handles the overlap between the player and an NPC.
-     * Initiates dialogue and combat if conditions are met.
-     * @param npc - The NPC data object.
-     */
-    private handleNpcOverlap(npc: NPCData) {
-        if (npc.interacted || this.dialogueManager.isDialogueActive()) return;
-
-        if (!this.dialogueLines || this.dialogueLines.length === 0) {
-            console.warn("No dialogue lines available for this NPC.");
-            return;
-        }
-
-        npc.interacted = true;
-        this.currentNpc = npc;
-
-        console.log(`Player interacted with NPC. Starting dialogue.`);
-        this.updateDialogue();
-        this.dialogueManager.startDialogue();
-    }
-
-    /**
-     * Handles transitioning to a new stage/map when the player moves out of bounds.
-     * @param up - Boolean indicating if the player moved up.
-     * @param down - Boolean indicating if the player moved down.
-     * @param left - Boolean indicating if the player moved left.
-     * @param right - Boolean indicating if the player moved right.
-     */
-    private handleTransition(up: boolean, down: boolean, left: boolean, right: boolean) {
-        if (this.isTransitioning) return;
-        this.isTransitioning = true;
-
-        const gameWidth = this.scale.width;
-        const gameHeight = this.scale.height;
-
-        const bufferX = 64 + 10;
-        const bufferY = 64 + 10;
-
-        let direction: keyof typeof WorldManager.maps | null = null;
-
-        if (left) direction = 'leftMap';
-        else if (right) direction = 'rightMap';
-        else if (up) direction = 'upMap';
-        else if (down) direction = 'downMap';
-
-        if (!direction) {
-            this.isTransitioning = false;
-            return;
-        }
-
-        this.clearAllNPCs();
-
-        Game.npcsState = [];
-        console.log(`Game state cleared for the new area.`);
-
-        WorldManager.generateMaps(direction);
-
-        this.cameras.main.fadeOut(500, 0, 0, 0);
-
-        if (this.player.body) this.player.body.checkCollision.none = true;
-
-        this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.background.setTexture(WorldManager.maps.currentMap);
-
-            if (direction === 'leftMap') {
-                this.player.x = gameWidth - bufferX;
-                this.player.y = Phaser.Math.Clamp(this.player.y, bufferY, gameHeight - bufferY);
-            } else if (direction === 'rightMap') {
-                this.player.x = bufferX;
-                this.player.y = Phaser.Math.Clamp(this.player.y, bufferY, gameHeight - bufferY);
-            } else if (direction === 'upMap') {
-                this.player.y = gameHeight - bufferY;
-                this.player.x = Phaser.Math.Clamp(this.player.x, bufferX, gameWidth - bufferX);
-            } else if (direction === 'downMap') {
-                this.player.y = bufferY;
-                this.player.x = Phaser.Math.Clamp(this.player.x, bufferX, gameWidth - bufferX);
-            }
-
-            this.player.setVelocity(0, 0);
-
-            if (this.player.body) this.player.body.checkCollision.none = false;
-
-            // Spawn new NPCs for the new area
-            const numberOfNPCs = Phaser.Math.Between(1, 5);
-            console.log(`Spawning ${numberOfNPCs} NPC(s) for the new area.`);
-            this.spawnNPCs(numberOfNPCs);
-
-            this.cameras.main.fadeIn(500, 0, 0, 0);
-            this.isTransitioning = false;
-        });
-    }
-
-    /**
-     * Destroys all existing NPC sprites and clears the NPCs array.
-     */
-    private clearAllNPCs() {
-        this.npcs.forEach(npc => {
-            if (npc.sprite) {
-                npc.sprite.destroy();
-                console.log(`Destroyed NPC sprite with ID: ${npc.id}`);
-            }
-        });
-        this.npcs = [];
-        console.log(`All NPCs have been cleared from the game world.`);
-    }
-
-    /**
-     * Sets up player animations.
-     */
-    private handleAnimations() {
+    private handleAnimations(): void {
         this.camera = this.cameras.main;
         this.camera.setBackgroundColor(0);
         this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, 'background1').setAlpha(1);
