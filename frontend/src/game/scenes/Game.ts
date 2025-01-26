@@ -48,6 +48,9 @@ export class Game extends Scene {
     dialogueText: Phaser.GameObjects.Text;
     private isTransitioning: boolean = false;
     inputPrompt: String;
+    backgroundMusic: Phaser.Sound.BaseSound;
+    playerHealthBar: Phaser.GameObjects.Graphics;
+    private healthText: Phaser.GameObjects.Text | null = null;
 
     // Buffer distance to avoid spawning NPCs too close to the player
     private npcSpawnBuffer: number = 150;
@@ -139,17 +142,20 @@ export class Game extends Scene {
                 this.isInCombat = true;
 
                 console.log(`Starting CombatScene with NPC ID: ${this.currentNpc.id}`);
-                this.cameras.main.shake(2000, 0.01, true); // 2-second shake for the swirl effect
-                this.time.delayedCall(2000, () => {
+                this.cameras.main.shake(3000, 0.01, true);
+                this.time.delayedCall(3000, () => {
                     this.scene.start('CombatScene', {
                         playerHP: this.playerHPInstance,
-                        npcIndexToRemove: this.currentNpc!.id, // Pass NPC ID
+                        npcIndex: this.currentNpc!.id, // Pass NPC ID
                         npcWasKilled: true,
                         npcData: { health: this.currentNpc!.health },
                         prompt: this.inputPrompt,
-                        playerPosition: { x: this.player.x, y: this.player.y } // Pass player's current position
+                        playerPosition: { x: this.player.x, y: this.player.y } 
                     });
                 });
+
+                this.backgroundMusic.stop();
+                this.sound.add('battle_start').play();
 
                 this.generateNewDialogue(this.inputPrompt);
             }
@@ -159,9 +165,18 @@ export class Game extends Scene {
     async create() {
         this.handleAnimations();
 
+        const ambientTrack = Phaser.Math.RND.pick(['ambient_one', 'ambient_two']);
+        this.backgroundMusic = this.sound.add(ambientTrack, { loop: true });
+        this.backgroundMusic.play();
+
+        
+
         // Initialize player at provided position or default
         const startX = Game.playerPosition.x;
         const startY = Game.playerPosition.y;
+
+        this.createPlayerHealthBar();
+        this.updatePlayerHealthBar();
 
         this.player = this.physics.add.sprite(startX, startY, 'player');
         this.player.setScale(0.5);
@@ -222,6 +237,7 @@ export class Game extends Scene {
         this.dialogueText.setVisible(false);
 
         EventBus.emit('current-scene-ready', this);
+        
     }
 
     update() {
@@ -260,6 +276,32 @@ export class Game extends Scene {
                 this.player.play('idle-down');
             }
         }
+    }
+
+    private createPlayerHealthBar() {
+        this.playerHealthBar = this.add.graphics();
+        this.updatePlayerHealthBar();
+    }
+    
+    private updatePlayerHealthBar() {
+        if (!this.playerHealthBar) return;
+    
+        this.playerHealthBar.clear();
+        this.playerHealthBar.fillStyle(0x000000, 1);
+        this.playerHealthBar.fillRect(20, 20, 200, 16); // Health bar background
+    
+        const width = Math.max((Game.playerHP / 100) * 200, 0);
+        this.playerHealthBar.fillStyle(0x00ff00, 1);
+        this.playerHealthBar.fillRect(20, 20, width, 16); // Health bar foreground
+    
+        if (this.healthText) {
+            this.healthText.destroy(); // Destroy the previous health text
+        }
+
+        this.healthText = this.add.text(230, 16, `HP: ${Game.playerHP}/100`, {
+            fontSize: '14px',
+            color: '#ffffff',
+        }).setDepth(1);
     }
 
     /**
@@ -338,6 +380,7 @@ export class Game extends Scene {
      */
     private createNPCsFromState() {
         Game.npcsState.forEach(npcData => {
+          console.log(npcData);
             if (npcData.defeated) return; // Skip defeated NPCs
 
             const sprite = this.physics.add.sprite(npcData.x, npcData.y, 'npc');
@@ -401,6 +444,7 @@ private spawnNPCs(numberOfNPCs: number): void {
   }
 
   console.log(`Spawned ${this.npcs.length} NPC(s) on the screen.`);
+  this.spawnPotion();
 }
 
     /**
@@ -422,6 +466,7 @@ private spawnNPCs(numberOfNPCs: number): void {
         console.log(`Player interacted with NPC. Starting dialogue.`);
         this.updateDialogue();
         this.dialogueManager.startDialogue();
+        this.sound.add('start_dialogue').play();
     }
 
     /**
@@ -454,6 +499,12 @@ private spawnNPCs(numberOfNPCs: number): void {
         }
 
         this.clearAllNPCs();
+
+        if (this.potion) {
+            this.potion.destroy();
+            this.potion = undefined;
+        }
+    
 
         Game.npcsState = [];
         console.log(`Game state cleared for the new area.`);
@@ -516,7 +567,49 @@ private spawnNPCs(numberOfNPCs: number): void {
         console.log(`All NPCs have been cleared from the game world.`);
     }
 
-    /**
+    
+
+    private potion?: Phaser.Physics.Arcade.Sprite;
+
+    private spawnPotion() {
+        // Clear any existing potion before spawning a new one
+        if (this.potion) {
+            this.potion.destroy();
+            this.potion = undefined;
+        }
+    
+        const chance = Phaser.Math.Between(1, 100);
+        if (chance <= 30) { // 30% chance to spawn a potion
+            const x = Phaser.Math.Between(50, this.scale.width - 50);
+            const y = Phaser.Math.Between(50, this.scale.height - 50);
+    
+            // Create a new potion sprite
+            this.potion = this.physics.add.sprite(x, y, 'potion');
+            this.potion.setOrigin(0.5, 0.5).setScale(0.07).setImmovable(true);
+    
+            // Enable player overlap with the potion
+            this.physics.add.overlap(this.player, this.potion, this.collectPotion as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
+    
+            console.log(`Potion spawned at (${x}, ${y}).`);
+        } else {
+            console.log("No potion spawned this time.");
+        }
+    }
+    
+    private collectPotion(player: Phaser.Physics.Arcade.Sprite, potion: Phaser.Physics.Arcade.Sprite) {
+        potion.destroy(); // Remove the potion
+        this.potion = undefined;
+    
+        // Heal the player
+        this.playerHPInstance = Math.min(Game.playerHP + 20, 100); // Max HP is 100
+        Game.playerHP = this.playerHPInstance;
+        
+        this.sound.add('heal').play();
+        console.log(`Potion collected! Player healed to ${this.playerHPInstance} HP.`);
+        this.updatePlayerHealthBar();
+    }
+
+    /** Phaser.Types.Physics.Arcade.ArcadePhysicsCallback
      * Sets up player animations.
      */
     private handleAnimations() {

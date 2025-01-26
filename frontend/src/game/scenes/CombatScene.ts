@@ -21,9 +21,16 @@ export class CombatScene extends Phaser.Scene {
   private playerPosition: { x: number; y: number };
   private combatMenu: Phaser.GameObjects.Container;
   private resultBox: Phaser.GameObjects.Container;
+  private combatLogs: string[] = [];
 
-  private actionNames: string[] = ['Attack', 'Defend', 'Special'];
+  private actionNames: string[] = [];
   private selectedIndex = 0;
+  private turnInProgress: boolean = false;
+  private combatEnded: boolean = false;
+
+  private npcWasKilled: boolean = false;
+
+  backgroundMusic: Phaser.Sound.BaseSound;
 
   constructor() {
     super('CombatScene');
@@ -44,6 +51,12 @@ export class CombatScene extends Phaser.Scene {
   }
 
   create() {
+    this.turnInProgress = false;
+    this.combatEnded = false;
+
+    this.backgroundMusic = this.sound.add('battle', { loop: true });
+    this.backgroundMusic.play();
+
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
     this.add
@@ -70,18 +83,43 @@ export class CombatScene extends Phaser.Scene {
         health: this.npcData.health,
       },
       this.playerHP,
-      this.updateCombatLog.bind(this)
+      this.handleCombatEnd.bind(this)
     );
+
+    // Start fetching menu options during the fade-in
+    this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      'Loading...',
+      { fontSize: '20px', color: '#ffffff' }
+    ).setOrigin(0.5);
 
     this.combatManager.startCombat(this.prompt, (menuOptions) => {
       this.actionNames = menuOptions.map((option) => option.name);
       this.createCombatMenu();
     });
 
-    this.events.on('npcAction', this.handleNPCAction, this); // Listen for NPC actions
+    // Clear and re-add event listeners
+    this.events.off('npcAction');
+    this.events.off('playerAction');
+
+    this.events.on('npcAction', this.handleNPCAction, this);
+    this.events.on('playerAction', this.handlePlayerAction, this);
+
+    // Reset combat log on scene start
+    this.resetCombatLog();
+  }
+
+  private resetCombatLog() {
+    this.combatLogs = [];
+    this.updateCombatLogUI();
   }
 
   private createCombatMenu() {
+    if (this.combatMenu) {
+      this.combatMenu.destroy();
+    }
+
     const menuWidth = 350;
     const menuHeight = this.actionNames.length * 70 + 20;
 
@@ -118,6 +156,10 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private createPlayerHealthBar() {
+    if (this.playerHealthBar) {
+      this.playerHealthBar.destroy();
+    }
+
     this.playerHealthBar = this.add.graphics();
     this.updatePlayerHealthBar();
   }
@@ -134,7 +176,6 @@ export class CombatScene extends Phaser.Scene {
 
   private highlightSelectedOption() {
     const menuItems = this.combatMenu.getAll().filter((child) => child instanceof Phaser.GameObjects.Text);
-
     const actionTexts = menuItems.filter((_, index) => index % 2 === 0);
 
     actionTexts.forEach((child, index) => {
@@ -147,43 +188,42 @@ export class CombatScene extends Phaser.Scene {
 
   private handleKeyboardInput() {
     this.input.keyboard?.on('keydown-W', () => {
+      if (this.turnInProgress || this.combatEnded) return;
       this.selectedIndex = (this.selectedIndex - 1 + this.actionNames.length) % this.actionNames.length;
       this.highlightSelectedOption();
     });
 
     this.input.keyboard?.on('keydown-S', () => {
+      if (this.turnInProgress || this.combatEnded) return;
       this.selectedIndex = (this.selectedIndex + 1) % this.actionNames.length;
       this.highlightSelectedOption();
     });
 
     this.input.keyboard?.on('keydown-ENTER', () => {
+      if (this.turnInProgress || this.combatEnded) return;
       const selectedAction = this.actionNames[this.selectedIndex];
       this.handleCombatOption(selectedAction);
     });
   }
 
   private handleCombatOption(option: string) {
-    switch (option) {
-      case this.actionNames[0]:
-        this.combatManager.playerAction('attack');
-        this.addCombatLog(`Player used ${option}`);
-        break;
-      case this.actionNames[1]:
-        this.combatManager.playerAction('defend');
-        this.addCombatLog(`Player used ${option}`);
-        break;
-      case this.actionNames[2]:
-        this.combatManager.playerAction('special');
-        this.addCombatLog(`Player used ${option}`);
-        break;
-    }
+    if (this.turnInProgress || this.combatEnded) return;
+    this.turnInProgress = true;
+
+    this.combatManager.playerAction(option, this.sound);
 
     this.updatePlayerHealthBar();
 
-    this.time.delayedCall(1000, () => {
-      const npcLog = this.combatManager.npcAction();
-      if (npcLog) this.addCombatLog(npcLog);
+    this.time.delayedCall(1500, () => {
+      if (!this.combatEnded) { // Only proceed if combat hasn't ended
+        this.combatManager.npcAction();
+        this.turnInProgress = false;
+      }
     });
+  }
+
+  private handlePlayerAction(actionLog: string) {
+    this.addCombatLog(actionLog);
   }
 
   private handleNPCAction(actionLog: string, playerHP: number) {
@@ -192,7 +232,50 @@ export class CombatScene extends Phaser.Scene {
     this.updatePlayerHealthBar();
   }
 
+  private handleCombatEnd(result: { playerHP: number; npcWasKilled: boolean }) {
+    if (this.combatEnded) return; // Prevent duplicate endings
+    this.combatEnded = true;
+
+    this.playerHP = result.playerHP;
+
+    this.sound.add('enemy_death').play();
+    if (result.npcWasKilled) {
+      this.addCombatLog('Player won the battle!');
+      this.npcWasKilled = true;
+
+    } else {
+      this.addCombatLog('Player lost the battle...');
+      this.npcWasKilled = false;
+    }
+
+    if(result.npcWasKilled) {
+
+    this.time.delayedCall(2000, () => {
+      this.cameras.main.fadeOut(1000, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('Game', { playerPosition: this.playerPosition, npcWasKilled: this.npcWasKilled, npcIndexToRemove: this.npcIndex, playerHP: this.playerHP });
+        this.backgroundMusic.stop();
+      });
+    });
+
+  } else {
+    this.time.delayedCall(2000, () => {
+      this.cameras.main.fadeOut(1000, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('GameOver');
+        this.backgroundMusic.stop();
+      });
+    });
+   
+  }
+
+}
+
   private createResultBox() {
+    if (this.resultBox) {
+      this.resultBox.destroy(); // Clean up existing result box
+    }
+
     const resultBoxWidth = 400;
     const resultBoxHeight = 200;
 
@@ -206,31 +289,27 @@ export class CombatScene extends Phaser.Scene {
     const resultText = this.add.text(10, 10, 'Combat Log:\n', {
       fontSize: '16px',
       color: '#ffffff',
-      wordWrap: { width: resultBoxWidth - 20 },
+      wordWrap: { width: 380 },
+      lineSpacing: 10, // Increased line spacing
     });
 
     this.resultBox.add(resultText);
   }
 
-  private updateCombatLog(message: { playerHP: number; npcWasKilled: boolean }) {
-    const resultText = this.resultBox.getAt(1) as Phaser.GameObjects.Text;
-
-    let logMessage = `Player HP: ${message.playerHP}\n`;
-    logMessage += message.npcWasKilled ? 'NPC defeated!' : 'NPC still alive!';
-
-    resultText.setText(`Combat Log:\n${logMessage}`);
+  private addCombatLog(message: string) {
+    this.combatLogs.push(message);
+    this.updateCombatLogUI();
   }
 
-  private addCombatLog(message: string) {
+  private updateCombatLogUI() {
     const resultText = this.resultBox.getAt(1) as Phaser.GameObjects.Text;
-    let logLines = resultText.text.split('\n');
-    const title = logLines[0];
+    const logText = ['Combat Log:', ...this.combatLogs.slice(-2)]
+      .map((log) => `${log}`)
+      .join('\n\n'); 
 
-    logLines.push(message);
-    if (logLines.length > 6) {
-      logLines = [title, ...logLines.slice(logLines.length - 5)];
-    }
-
-    resultText.setText(logLines.join('\n'));
+    resultText.setText(logText);
+    resultText.setStyle({
+      lineSpacing: 20,
+    });
   }
 }

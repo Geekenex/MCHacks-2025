@@ -8,9 +8,6 @@ export interface npc {
   healthBar?: Phaser.GameObjects.Graphics;
 }
 
-const DAMAGE_TAKEN = 10;
-const DAMAGE_DEALT = 100;
-
 export class CombatManager {
   private scene: Phaser.Scene;
   private npc: npc;
@@ -18,6 +15,7 @@ export class CombatManager {
   private menuOptions: { name: string; type: 'offense' | 'defense' | 'wacky' }[] = [];
   private onCombatEnd: (result: { playerHP: number; npcWasKilled: boolean }) => void;
   private isPlayerTurn: boolean = true;
+  private combatEnded: boolean = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -48,6 +46,7 @@ export class CombatManager {
 
     try {
       const output = await client.runFlow(`${import.meta.env.VITE_COMBAT_FLOW_ID}`, {
+        recipient: "josephambayec76@gmail.com",
         prompt: `Create 3 abilities for this prompt: ${promptText}`,
       });
 
@@ -85,28 +84,53 @@ export class CombatManager {
     }
   }
 
-  playerAction(type: 'attack' | 'defend' | 'special') {
-    if (!this.isPlayerTurn) return;
+  public playerAction(actionName: string, sound: Phaser.Sound.NoAudioSoundManager | Phaser.Sound.HTML5AudioSoundManager | Phaser.Sound.WebAudioSoundManager) {
+    if (!this.isPlayerTurn || this.combatEnded) return;
 
-    switch (type) {
-      case 'attack':
+    const action = this.menuOptions.find((opt) => opt.name === actionName);
+    if (!action) return;
+
+    // role a 1/4 chance to miss a wacky attack
+
+    let actionLog = '';
+
+
+    switch (action.type) {
+      case 'offense':
         this.npc.health -= 15;
+        sound.play('attack');
+        actionLog = `Player used ${actionName} and dealt 15 damage to the enemy!`;
         break;
-      case 'defend':
+      case 'defense':
         this.playerHP += 10;
+        sound.play('combat_heal');
+        actionLog = `Player used ${actionName} and healed 10 HP!`;
         break;
-      case 'special':
-        this.npc.health -= 25;
-        break;
+      case 'wacky':
+        const random = Math.random() * 4
+
+        if (random <= 1) {
+          actionLog = `Player used ${actionName} but missed!`;
+          break;
+        } else {
+
+          this.npc.health -= 25;
+          sound.play('special_attack');
+          actionLog = `Player used ${actionName} and dealt 25 damage to the enemy!`;
+          break;
+        }
+
     }
 
     this.updateHealthBar();
     this.checkCombatOutcome();
     this.isPlayerTurn = false; // Switch to NPC's turn
+
+    this.scene.events.emit('playerAction', actionLog);
   }
 
-  npcAction(): string {
-    if (this.isPlayerTurn) return '';
+  public npcAction() {
+    if (this.isPlayerTurn || this.combatEnded) return; // Prevent NPC action if not its turn or combat has ended
 
     const randomIndex = Math.floor(Math.random() * this.menuOptions.length);
     const selectedAction = this.menuOptions[randomIndex];
@@ -115,29 +139,37 @@ export class CombatManager {
     switch (selectedAction.type) {
       case 'offense':
         this.playerHP -= 15;
-        actionLog = `Enemy used ${selectedAction.name}! Player takes 20 damage.`;
+        actionLog = `Enemy used ${selectedAction.name} and dealt 15 damage!`;
         break;
       case 'defense':
         this.npc.health += 10;
         this.updateHealthBar();
-        actionLog = `Enemy used ${selectedAction.name}! Enemy heals 10 HP.`;
+        actionLog = `Enemy used ${selectedAction.name} and healed 10 HP!`;
         break;
       case 'wacky':
-        this.playerHP -= 25;
-        actionLog = `Enemy used ${selectedAction.name}! Player takes 30 damage.`;
-        break;
+        const random = Math.random() * 4
+
+        if (random <= 1) {
+          actionLog = `Enemy used ${selectedAction.name} but missed!`;
+          break;
+        } else {
+          this.playerHP -= 25;
+          actionLog = `Enemy used ${selectedAction.name} and dealt 25 damage!`;
+          break;
+        }
     }
 
     this.isPlayerTurn = true; // Switch back to player's turn
     this.scene.events.emit('npcAction', actionLog, this.playerHP);
     this.checkCombatOutcome();
-    return actionLog;
   }
 
   private checkCombatOutcome() {
     if (this.npc.health <= 0) {
+      this.combatEnded = true; // Set combat as ended
       this.onCombatEnd({ playerHP: this.playerHP, npcWasKilled: true });
     } else if (this.playerHP <= 0) {
+      this.combatEnded = true; // Set combat as ended
       this.onCombatEnd({ playerHP: 0, npcWasKilled: false });
     }
   }
