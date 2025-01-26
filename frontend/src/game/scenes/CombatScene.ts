@@ -21,10 +21,12 @@ export class CombatScene extends Phaser.Scene {
   private playerPosition: { x: number; y: number };
   private combatMenu: Phaser.GameObjects.Container;
   private resultBox: Phaser.GameObjects.Container;
+  private combatLogs: string[] = [];
 
-  private actionNames: string[] = ['Attack', 'Defend', 'Special'];
+  private actionNames: string[] = [];
   private selectedIndex = 0;
-  private turnInProgress: boolean = false; // Prevent duplicate actions during a turn
+  private turnInProgress: boolean = false;
+  private combatEnded: boolean = false;
 
   constructor() {
     super('CombatScene');
@@ -45,6 +47,10 @@ export class CombatScene extends Phaser.Scene {
   }
 
   create() {
+    // Reset state variables
+    this.turnInProgress = false;
+    this.combatEnded = false;
+
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
     this.add
@@ -79,11 +85,27 @@ export class CombatScene extends Phaser.Scene {
       this.createCombatMenu();
     });
 
+    // Clear and re-add event listeners
+    this.events.off('npcAction');
+    this.events.off('playerAction');
+
     this.events.on('npcAction', this.handleNPCAction, this);
     this.events.on('playerAction', this.handlePlayerAction, this);
+
+    // Reset combat log on scene start
+    this.resetCombatLog();
+  }
+
+  private resetCombatLog() {
+    this.combatLogs = [];
+    this.updateCombatLogUI();
   }
 
   private createCombatMenu() {
+    if (this.combatMenu) {
+      this.combatMenu.destroy(); // Clean up any existing menu
+    }
+
     const menuWidth = 350;
     const menuHeight = this.actionNames.length * 70 + 20;
 
@@ -120,6 +142,10 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private createPlayerHealthBar() {
+    if (this.playerHealthBar) {
+      this.playerHealthBar.destroy(); // Clean up existing health bar
+    }
+
     this.playerHealthBar = this.add.graphics();
     this.updatePlayerHealthBar();
   }
@@ -148,48 +174,34 @@ export class CombatScene extends Phaser.Scene {
 
   private handleKeyboardInput() {
     this.input.keyboard?.on('keydown-W', () => {
-      if (this.turnInProgress) return; // Prevent input during NPC's turn
+      if (this.turnInProgress || this.combatEnded) return;
       this.selectedIndex = (this.selectedIndex - 1 + this.actionNames.length) % this.actionNames.length;
       this.highlightSelectedOption();
     });
 
     this.input.keyboard?.on('keydown-S', () => {
-      if (this.turnInProgress) return;
+      if (this.turnInProgress || this.combatEnded) return;
       this.selectedIndex = (this.selectedIndex + 1) % this.actionNames.length;
       this.highlightSelectedOption();
     });
 
     this.input.keyboard?.on('keydown-ENTER', () => {
-      if (this.turnInProgress) return;
+      if (this.turnInProgress || this.combatEnded) return;
       const selectedAction = this.actionNames[this.selectedIndex];
       this.handleCombatOption(selectedAction);
     });
   }
 
   private handleCombatOption(option: string) {
-    if (this.turnInProgress) return;
+    if (this.turnInProgress || this.combatEnded) return;
     this.turnInProgress = true;
 
-    switch (option) {
-      case this.actionNames[0]:
-        this.combatManager.playerAction('attack');
-        this.addCombatLog(`Player attacked the NPC!`);
-        break;
-      case this.actionNames[1]:
-        this.combatManager.playerAction('defend');
-        this.addCombatLog(`Player healed 10 HP!`);
-        break;
-      case this.actionNames[2]:
-        this.combatManager.playerAction('special');
-        this.addCombatLog(`Player used a special attack!`);
-        break;
-    }
+    this.combatManager.playerAction(option);
 
     this.updatePlayerHealthBar();
 
     this.time.delayedCall(1500, () => {
       const npcLog = this.combatManager.npcAction();
-      if (npcLog) this.addCombatLog(npcLog);
       this.turnInProgress = false;
     });
   }
@@ -205,6 +217,9 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private handleCombatEnd(result: { playerHP: number; npcWasKilled: boolean }) {
+    if (this.combatEnded) return; // Prevent duplicate endings
+    this.combatEnded = true;
+
     if (result.npcWasKilled) {
       this.addCombatLog('Player won the battle!');
     } else {
@@ -220,6 +235,10 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private createResultBox() {
+    if (this.resultBox) {
+      this.resultBox.destroy(); // Clean up existing result box
+    }
+
     const resultBoxWidth = 400;
     const resultBoxHeight = 200;
 
@@ -240,15 +259,13 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private addCombatLog(message: string) {
+    this.combatLogs.push(message);
+    this.updateCombatLogUI();
+  }
+
+  private updateCombatLogUI() {
     const resultText = this.resultBox.getAt(1) as Phaser.GameObjects.Text;
-    let logLines = resultText.text.split('\n');
-    const title = logLines[0];
-
-    logLines.push(message);
-    if (logLines.length > 6) {
-      logLines = [title, ...logLines.slice(logLines.length - 5)];
-    }
-
-    resultText.setText(logLines.join('\n'));
+    const logText = ['Combat Log:', ...this.combatLogs.slice(-5)].join('\n'); // Show last 5 logs
+    resultText.setText(logText);
   }
 }
