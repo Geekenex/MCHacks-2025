@@ -35,7 +35,20 @@ export class Preloader extends Scene
         this.load.image('logo', 'logo.png');
         this.load.image('star', 'star.png');
         this.load.image('background1', 'background.png')
+        this.load.image('potion', 'potion.png')
     //     this.load.image('player', 'player.png')
+
+        //audio
+        this.load.audio('ambient_one', 'soundtrack/ambient_song_one.mp3');
+        this.load.audio('ambient_two', 'soundtrack/ambient_song_two.mp3');
+        this.load.audio('battle', 'soundtrack/battle_song.mp3');
+        this.load.audio('battle_start', 'soundtrack/soundeffect_battle_start.mp3');
+        this.load.audio('main_menu', 'soundtrack/main_menu_song.mp3');
+        this.load.audio('attack', 'soundtrack/soundeffect_attack.mp3');
+        this.load.audio('enemy_death', 'soundtrack/soundeffect_enemy_death.mp3');
+        this.load.audio('game_start', 'soundtrack/soundeffect_game_start.mp3');
+        this.load.audio('heal', 'soundtrack/soundeffect_heal.mp3');
+        this.load.audio('start_dialogue', 'soundtrack/soundeffect_start_dialogue.mp3');
     }
 
     create ()

@@ -2,7 +2,6 @@ import { GameObjects, Scene } from 'phaser';
 
 import { EventBus } from '../EventBus';
 
-import { GumloopClient } from "gumloop";
 
 //env vars
 import.meta.env.VITE_API_KEY;
@@ -18,6 +17,7 @@ export class MainMenu extends Scene
     logo: GameObjects.Image;
     title: GameObjects.Text;
     logoTween: Phaser.Tweens.Tween | null;
+    backgroundMusic: Phaser.Sound.BaseSound;
 
     constructor ()
     {
@@ -27,6 +27,9 @@ export class MainMenu extends Scene
     create ()
     {
         this.background = this.add.image(512, 384, 'background');
+
+        this.backgroundMusic = this.sound.add('main_menu', { loop: true });
+        this.backgroundMusic.play();
 
         this.logo = this.add.image(512, 300, 'logo').setDepth(100);
 
@@ -54,32 +57,6 @@ export class MainMenu extends Scene
 
         EventBus.emit('current-scene-ready', this);
     }
-    // sendToAPI(input: string) {
-    //     const client = new GumloopClient({
-    //         apiKey: `${import.meta.env.VITE_API_KEY}`,
-    //         userId: `${import.meta.env.VITE_USER_ID}`,
-    //       });
-    //         // Run a flow and wait for outputs
-    //         async function runFlow() {
-    //             try {
-    //               const output = await client.runFlow(`${import.meta.env.VITE_FLOW_ID}`, {
-    //                 recipient: "killian.hedou@gmail.com",
-                    
-    //                 prompt: input
-                    
-    //               });
-              
-    //               console.log(output);
-    //             } catch (error) {
-    //               console.error("Flow execution failed:", error);
-    //             }
-    //           }
-              
-    //     // runFlow();
-    //     //navigate to game scene
-    //     // this.changeScene();
-    // }
-
     
     changeScene (input: String)
     {
@@ -90,6 +67,8 @@ export class MainMenu extends Scene
         }
 
         this.scene.start('Game', { input });
+        this.backgroundMusic.stop();
+        this.sound.add('game_start').play();
     }
 
     moveLogo (vueCallback: ({ x, y }: { x: number, y: number }) => void)
