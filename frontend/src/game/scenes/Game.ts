@@ -206,7 +206,9 @@ export class Game extends Scene {
         this.player.setSize(64,64)
         this.player.setScale(1);
         this.player.setCollideWorldBounds(true);
+        this.player.setVisible(true);
         this.player.play('idle-down');
+        this.player.setDepth(1);
         this.physics.world.enable(this.player);
         if (this.player.body) {
             this.player.setCollideWorldBounds(true, 0, 0, true);
@@ -259,6 +261,27 @@ export class Game extends Scene {
         });
         this.dialogueText.setVisible(false);
 
+        // init background texture
+        const currentMapTextureKey = WorldManager.maps.currentMap;
+
+        // Ensure the texture is loaded before using it
+        if (!this.textures.exists(currentMapTextureKey)) {
+            const image = new Image();
+            image.src = `data:image/png;base64,${currentMapTextureKey}`;
+            image.onload = () => {
+                this.textures.addImage(currentMapTextureKey, image);
+                this.background.setTexture(currentMapTextureKey); // Set the background texture here
+            };
+        } else {
+            this.background = this.add.image(
+                this.scale.width / 2,
+                this.scale.height / 2,
+                currentMapTextureKey
+            ).setAlpha(1).setDepth(-1);
+        }
+
+
+        
         EventBus.emit('current-scene-ready', this);
         
     }
@@ -532,10 +555,13 @@ private spawnNPCs(numberOfNPCs: number): void {
         Game.npcsState = [];
         console.log(`Game state cleared for the new area.`);
         
+        WorldManager.generateMaps(direction);
         const image = new Image();
         image.src = `data:image/png;base64,${WorldManager.maps[direction]}`;
+        let texture_set = false;
         image.onload = () => {
             this.textures.addImage(WorldManager.maps[direction], image);
+            texture_set = true;
         };
 
 
@@ -545,6 +571,8 @@ private spawnNPCs(numberOfNPCs: number): void {
 
 
         this.cameras.main.once('camerafadeoutcomplete', () => {
+            while(!texture_set); // Wait for the texture to be set
+
             this.background.setTexture(WorldManager.maps[direction]);
 
             if (direction === 'leftMap') {
@@ -572,7 +600,6 @@ private spawnNPCs(numberOfNPCs: number): void {
 
             this.cameras.main.fadeIn(500, 0, 0, 0);
             this.isTransitioning = false;
-            WorldManager.generateMaps(direction);
         });
     }
 
@@ -639,6 +666,7 @@ private spawnNPCs(numberOfNPCs: number): void {
         this.camera = this.cameras.main;
         this.camera.setBackgroundColor(0);
         console.log(WorldManager.maps.currentMap);
+
         this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, WorldManager.maps.currentMap).setAlpha(1);
 
         this.anims.create({
@@ -689,5 +717,6 @@ private spawnNPCs(numberOfNPCs: number): void {
             frameRate: 1,
             repeat: -1,
         });
+
     }
 }
