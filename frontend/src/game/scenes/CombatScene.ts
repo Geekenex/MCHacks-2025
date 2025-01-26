@@ -248,6 +248,8 @@ export class CombatScene extends Phaser.Scene {
       this.npcWasKilled = false;
     }
 
+    if(result.npcWasKilled) {
+
     this.time.delayedCall(2000, () => {
       this.cameras.main.fadeOut(1000, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -255,7 +257,19 @@ export class CombatScene extends Phaser.Scene {
         this.backgroundMusic.stop();
       });
     });
+
+  } else {
+    this.time.delayedCall(2000, () => {
+      this.cameras.main.fadeOut(1000, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('GameOver');
+        this.backgroundMusic.stop();
+      });
+    });
+   
   }
+
+}
 
   private createResultBox() {
     if (this.resultBox) {
