@@ -90,7 +90,10 @@ export class CombatManager {
     const action = this.menuOptions.find((opt) => opt.name === actionName);
     if (!action) return;
 
+    // role a 1/4 chance to miss a wacky attack
+
     let actionLog = '';
+
 
     switch (action.type) {
       case 'offense':
@@ -102,9 +105,18 @@ export class CombatManager {
         actionLog = `Player used ${actionName} and healed 10 HP!`;
         break;
       case 'wacky':
-        this.npc.health -= 25;
-        actionLog = `Player used ${actionName} and dealt 25 damage to the enemy!`;
-        break;
+        const random = Math.random() * 4
+
+        if (random <= 1) {
+          actionLog = `Player used ${actionName} but missed!`;
+          break;
+        } else {
+
+          this.npc.health -= 25;
+          actionLog = `Player used ${actionName} and dealt 25 damage to the enemy!`;
+          break;
+        }
+
     }
 
     this.updateHealthBar();
@@ -132,9 +144,16 @@ export class CombatManager {
         actionLog = `Enemy used ${selectedAction.name} and healed 10 HP!`;
         break;
       case 'wacky':
-        this.playerHP -= 25;
-        actionLog = `Enemy used ${selectedAction.name} and dealt 25 damage!`;
-        break;
+        const random = Math.random() * 4
+
+        if (random <= 1) {
+          actionLog = `Enemy used ${selectedAction.name} but missed!`;
+          break;
+        } else {
+          this.playerHP -= 25;
+          actionLog = `Enemy used ${selectedAction.name} and dealt 25 damage!`;
+          break;
+        }
     }
 
     this.isPlayerTurn = true; // Switch back to player's turn
