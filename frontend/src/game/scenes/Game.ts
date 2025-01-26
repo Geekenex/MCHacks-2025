@@ -227,6 +227,26 @@ export class Game extends Scene {
             });
         }
 
+
+        this.updateDialogue();
+
+        this.dialogueBox = this.add.rectangle(0, this.scale.height - 80, this.scale.width, 80, 0x000000, 1).setOrigin(0, 0);
+        this.dialogueBox.setVisible(false);
+
+        this.dialogueText = this.add.text(20, this.scale.height - 70, '', {
+            fontSize: '16px',
+            color: '#ffffff',
+            wordWrap: { width: this.scale.width - 40 },
+        });
+        this.dialogueText.setVisible(false);
+
+
+        this.physics.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body, up: boolean, down: boolean, left: boolean, right: boolean) => {
+            if (body.gameObject === this.player) {
+                this.handleTransition(up, down, left, right);
+            }
+        });
+
         // Clear existing NPCs before creating new ones
         this.clearAllNPCs();
 
@@ -242,17 +262,6 @@ export class Game extends Scene {
             this.createNPCsFromState();
         }
 
-        this.updateDialogue();
-
-        this.dialogueBox = this.add.rectangle(0, this.scale.height - 80, this.scale.width, 80, 0x000000, 1).setOrigin(0, 0);
-        this.dialogueBox.setVisible(false);
-
-        this.dialogueText = this.add.text(20, this.scale.height - 70, '', {
-            fontSize: '16px',
-            color: '#ffffff',
-            wordWrap: { width: this.scale.width - 40 },
-        });
-        this.dialogueText.setVisible(false);
 
         EventBus.emit('current-scene-ready', this);
 
