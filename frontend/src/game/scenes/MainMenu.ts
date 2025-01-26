@@ -1,5 +1,5 @@
 import { GameObjects, Scene } from 'phaser';
-
+import { SpriteManager } from '../scripts/SpriteManager';
 import { EventBus } from '../EventBus';
 import { WorldManager } from '../scripts/WorldManager';
 
@@ -23,6 +23,7 @@ export class MainMenu extends Scene
     {
         super('MainMenu');
     }
+    
 
     async create ()
     {
@@ -50,9 +51,20 @@ export class MainMenu extends Scene
                     console.log('User Input:', input);
                     // this.sendToAPI(input);
                     //start game scene w prompt
-                    await Promise.all([
-                        WorldManager.init(input),
-                    ]);
+                    await SpriteManager.generateSprite(input);
+
+                    const playerSprite = SpriteManager.getSprite();
+                    if (playerSprite) {
+                        //this.textures.addBase64('player', playerSprite);
+                        console.log('Player sprite loaded and added to textures.');
+                    } else {
+                        alert('Failed to load the sprite. Please try again.');
+                        return;
+                    }
+                    //await Promise.all([
+                     //   WorldManager.init(input),
+                   // ]);
+                    
                     this.background = this.add.image(512, 384, this.textures.get(WorldManager.maps.currentMap));
 
                     this.changeScene(input);
@@ -68,13 +80,15 @@ export class MainMenu extends Scene
     
     changeScene (input: String)
     {
+
+        const playerSpriteBase64 = SpriteManager.getSprite()
         if (this.logoTween)
         {
             this.logoTween.stop();
             this.logoTween = null;
         }
 
-        this.scene.start('Game', { input });
+        this.scene.start('Game', { input, playerBase64: playerSpriteBase64 });
         this.backgroundMusic.stop();
         this.sound.add('game_start').play();
     }
