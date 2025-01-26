@@ -236,6 +236,8 @@ export class CombatScene extends Phaser.Scene {
     if (this.combatEnded) return; // Prevent duplicate endings
     this.combatEnded = true;
 
+    this.playerHP = result.playerHP;
+
     this.sound.add('enemy_death').play();
     if (result.npcWasKilled) {
       this.addCombatLog('Player won the battle!');
@@ -249,7 +251,7 @@ export class CombatScene extends Phaser.Scene {
     this.time.delayedCall(2000, () => {
       this.cameras.main.fadeOut(1000, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('Game', { playerPosition: this.playerPosition, npcWasKilled: this.npcWasKilled, npcIndexToRemove: this.npcIndex });
+        this.scene.start('Game', { playerPosition: this.playerPosition, npcWasKilled: this.npcWasKilled, npcIndexToRemove: this.npcIndex, playerHP: this.playerHP });
         this.backgroundMusic.stop();
       });
     });
