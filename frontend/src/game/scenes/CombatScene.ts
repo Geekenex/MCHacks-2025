@@ -8,6 +8,7 @@ interface ICombatData {
   };
   npcIndex: number;
   prompt: string;
+  playerPosition: { x: number; y: number }; // Add player position
 }
 
 export class CombatScene extends Phaser.Scene {
@@ -16,7 +17,9 @@ export class CombatScene extends Phaser.Scene {
   private npcIndex: number;
   private combatManager: CombatManager;
   private npcSprite: Phaser.GameObjects.Sprite;
+  private playerSprite: Phaser.GameObjects.Sprite;
   private prompt: string;
+  private playerPosition: { x: number; y: number }; // Store player's position
 
   constructor() {
     super('CombatScene');
@@ -27,6 +30,7 @@ export class CombatScene extends Phaser.Scene {
     this.npcData = data.npcData;
     this.npcIndex = data.npcIndex;
     this.prompt = data.prompt;
+    this.playerPosition = data.playerPosition; // Initialize the player position
   }
 
   preload() {
@@ -36,18 +40,27 @@ export class CombatScene extends Phaser.Scene {
   }
 
   create() {
-    this.add.image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'combatBG')
+    this.cameras.main.fadeIn(1000, 0, 0, 0); // Fade-in transition into CombatScene
+
+    this.add
+      .image(this.cameras.main.width / 2, this.cameras.main.height / 2, 'combatBG')
       .setOrigin(0.5)
       .setDisplaySize(this.cameras.main.width, this.cameras.main.height);
 
-    const playerSprite = this.add.sprite(200, 300, 'playerBattleSprite').setScale(0.6);
+    // Player positioned at the bottom center
+    this.playerSprite = this.add
+      .sprite(this.cameras.main.width - 800, this.cameras.main.height - 150, 'playerBattleSprite')
+      .setScale(0.6);
 
-    this.npcSprite = this.add.sprite(600, 250, 'npcBattleSprite').setScale(0.6);
+    // Enemy positioned at the top center
+    this.npcSprite = this.add
+      .sprite(this.cameras.main.width - 250, 350, 'npcBattleSprite')
+      .setScale(0.6);
 
     const npcDataForCombat = {
-      sprite: this.npcSprite as unknown as Phaser.Physics.Arcade.Sprite, // Casting for compatibility
+      sprite: this.npcSprite as unknown as Phaser.Physics.Arcade.Sprite,
       interacted: true,
-      health: this.npcData.health
+      health: this.npcData.health,
     };
 
     this.combatManager = new CombatManager(
@@ -57,11 +70,15 @@ export class CombatScene extends Phaser.Scene {
       (result: { playerHP: number; npcWasKilled: boolean }) => {
         this.playerHP = result.playerHP;
 
-        // Start the Game scene and pass back necessary data
-        this.scene.start('Game', {
-          playerHP: this.playerHP,
-          npcIndexToRemove: this.npcIndex,
-          npcWasKilled: result.npcWasKilled,
+        // Pass player position back to Game scene
+        this.cameras.main.fadeOut(1000, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+          this.scene.start('Game', {
+            playerHP: this.playerHP,
+            npcIndexToRemove: this.npcIndex,
+            npcWasKilled: result.npcWasKilled,
+            playerPosition: this.playerPosition, // Pass the player position
+          });
         });
       }
     );

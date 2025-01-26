@@ -114,12 +114,17 @@ export class Game extends Scene {
   
             const npcIndex = this.npcs.indexOf(this.currentNpc);
             console.log(`Starting CombatScene with NPC Index: ${npcIndex}`);
-            this.scene.start('CombatScene', {
-                playerHP: this.playerHP,
-                npcIndex: npcIndex,
-                npcData: { health: this.currentNpc.health }, 
-                prompt: this.inputPrompt
+            this.cameras.main.shake(2000, 0.01, true); // 2-second shake for the swirl effect
+            this.time.delayedCall(2000, () => {
+                this.scene.start('CombatScene', {
+                    playerHP: this.playerHP,
+                    npcIndex: npcIndex,
+                    npcData: { health: this.currentNpc!.health }, 
+                    prompt: this.inputPrompt,
+                    playerPosition: { x: this.player.x, y: this.player.y }
+                });
             });
+
             this.generateNewDialogue(this.inputPrompt);
         }
       });
@@ -127,7 +132,8 @@ export class Game extends Scene {
 
     create() {
         this.handleAnimations();
-
+    
+        // Reset player to initial overworld position
         this.player = this.physics.add.sprite(256, 256, 'player');
         this.player.setScale(0.5);
         this.player.setCollideWorldBounds(true);
@@ -140,27 +146,21 @@ export class Game extends Scene {
             this.player.body.setSize(newBodyWidth, newBodyHeight);
             this.player.body.setOffset((256 - newBodyWidth) / 2, (256 - newBodyHeight) / 2);
         }
-
-        this.physics.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body, up: boolean, down: boolean, left: boolean, right: boolean) => {
-            if (body.gameObject === this.player) {
-                this.handleTransition(up, down, left, right);
-            }
-        });
-
+    
         const npcPositions = [
             { x: 400, y: 256 },
             { x: 500, y: 300 },
             { x: 600, y: 256 },
         ];
-
+    
         let nextNpcId = 0;
-
+    
         npcPositions.forEach((pos, index) => {
             if (this.npcs[index]?.defeated) {
                 console.log(`Skipping NPC ${index} (already defeated).`);
                 return; // Skip NPC creation
             }
-
+    
             const sprite = this.physics.add.sprite(pos.x, pos.y, 'npc');
             sprite.setOrigin(0.5, 0.5);
             sprite.setImmovable(true);
@@ -168,7 +168,7 @@ export class Game extends Scene {
             if (sprite.body) {
                 sprite.body.setSize(32, 32);
             }
-
+    
             const npcData: NPCData = {
                 id: nextNpcId++, // Assign unique ID
                 sprite,
@@ -176,14 +176,14 @@ export class Game extends Scene {
                 health: 100,
                 defeated: false,
             };
-
+    
             this.physics.add.overlap(this.player, sprite, () => {
                 this.handleNpcOverlap(npcData);
             });
-
+    
             this.npcs.push(npcData);
         });
-
+    
         if (this.input.keyboard) {
             this.cursors = this.input.keyboard.createCursorKeys();
             this.wasd = {
