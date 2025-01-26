@@ -17,6 +17,7 @@ export class MainMenu extends Scene
     logo: GameObjects.Image;
     title: GameObjects.Text;
     logoTween: Phaser.Tweens.Tween | null;
+    backgroundMusic: Phaser.Sound.BaseSound;
 
     constructor ()
     {
@@ -26,6 +27,9 @@ export class MainMenu extends Scene
     create ()
     {
         this.background = this.add.image(512, 384, 'background');
+
+        this.backgroundMusic = this.sound.add('main_menu', { loop: true });
+        this.backgroundMusic.play();
 
         this.logo = this.add.image(512, 300, 'logo').setDepth(100);
 
@@ -63,6 +67,8 @@ export class MainMenu extends Scene
         }
 
         this.scene.start('Game', { input });
+        this.backgroundMusic.stop();
+        this.sound.add('game_start').play();
     }
 
     moveLogo (vueCallback: ({ x, y }: { x: number, y: number }) => void)

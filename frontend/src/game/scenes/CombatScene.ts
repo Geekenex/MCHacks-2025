@@ -30,6 +30,8 @@ export class CombatScene extends Phaser.Scene {
 
   private npcWasKilled: boolean = false;
 
+  backgroundMusic: Phaser.Sound.BaseSound;
+
   constructor() {
     super('CombatScene');
   }
@@ -51,6 +53,9 @@ export class CombatScene extends Phaser.Scene {
   create() {
     this.turnInProgress = false;
     this.combatEnded = false;
+
+    this.backgroundMusic = this.sound.add('battle', { loop: true });
+    this.backgroundMusic.play();
 
     this.cameras.main.fadeIn(1000, 0, 0, 0);
 
@@ -231,6 +236,7 @@ export class CombatScene extends Phaser.Scene {
     if (this.combatEnded) return; // Prevent duplicate endings
     this.combatEnded = true;
 
+    this.sound.add('enemy_death').play();
     if (result.npcWasKilled) {
       this.addCombatLog('Player won the battle!');
       this.npcWasKilled = true;
@@ -244,6 +250,7 @@ export class CombatScene extends Phaser.Scene {
       this.cameras.main.fadeOut(1000, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
         this.scene.start('Game', { playerPosition: this.playerPosition, npcWasKilled: this.npcWasKilled, npcIndexToRemove: this.npcIndex });
+        this.backgroundMusic.stop();
       });
     });
   }
@@ -281,6 +288,7 @@ export class CombatScene extends Phaser.Scene {
   private updateCombatLogUI() {
     const resultText = this.resultBox.getAt(1) as Phaser.GameObjects.Text;
 
+    this.sound.add('attack').play();
     const logText = ['Combat Log:', ...this.combatLogs.slice(-2)]
       .map((log) => `${log}`)
       .join('\n\n'); 

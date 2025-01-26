@@ -48,6 +48,7 @@ export class Game extends Scene {
     dialogueText: Phaser.GameObjects.Text;
     private isTransitioning: boolean = false;
     inputPrompt: String;
+    backgroundMusic: Phaser.Sound.BaseSound;
 
     // Buffer distance to avoid spawning NPCs too close to the player
     private npcSpawnBuffer: number = 150;
@@ -152,6 +153,9 @@ export class Game extends Scene {
                     });
                 });
 
+                this.backgroundMusic.stop();
+                this.sound.add('battle_start').play();
+
                 this.generateNewDialogue(this.inputPrompt);
             }
         });
@@ -159,6 +163,11 @@ export class Game extends Scene {
 
     create() {
         this.handleAnimations();
+
+        const ambientTrack = Phaser.Math.RND.pick(['ambient_one', 'ambient_two']);
+        this.backgroundMusic = this.sound.add(ambientTrack, { loop: true });
+        this.backgroundMusic.play();
+
         
 
         // Initialize player at provided position or default
@@ -427,6 +436,7 @@ private spawnNPCs(numberOfNPCs: number): void {
         console.log(`Player interacted with NPC. Starting dialogue.`);
         this.updateDialogue();
         this.dialogueManager.startDialogue();
+        this.sound.add('start_dialogue').play();
     }
 
     /**
@@ -558,6 +568,7 @@ private spawnNPCs(numberOfNPCs: number): void {
         this.playerHPInstance = Math.min(this.playerHPInstance + 20, 100); // Max HP is 100
         Game.playerHP = this.playerHPInstance;
     
+        this.sound.add('heal').play();
         console.log(`Potion collected! Player healed to ${this.playerHPInstance} HP.`);
     }
 
