@@ -112,7 +112,6 @@ export class Game extends Scene {
     }
 
     updateDialogue() {
-<<<<<<< HEAD
       this.dialogueManager = new DialogueManager(this, this.dialogueLines, () => {
         if (this.currentNpc) {
             this.isInCombat = true;
@@ -133,34 +132,12 @@ export class Game extends Scene {
             this.generateNewDialogue(this.inputPrompt);
         }
       });
-=======
-        this.dialogueManager = new DialogueManager(this, this.dialogueLines, () => {
-            if (this.currentNpc) {
-                this.isInCombat = true;
-
-                const npcIndex = this.npcs.indexOf(this.currentNpc);
-                console.log(`Starting CombatScene with NPC Index: ${npcIndex}`);
-                this.scene.start('CombatScene', {
-                    playerHP: this.playerHP,
-                    npcIndex: npcIndex,
-                    npcData: { health: this.currentNpc.health }, 
-                    prompt: this.inputPrompt
-                });
-                this.generateNewDialogue(this.inputPrompt);
-            }
-        });
->>>>>>> c85d15c80e7479d6c090871931e0a2d203b6db8d
     }
 
     create() {
         this.handleAnimations();
-<<<<<<< HEAD
     
         // Reset player to initial overworld position
-=======
-
-        // Initialize player at starting position
->>>>>>> c85d15c80e7479d6c090871931e0a2d203b6db8d
         this.player = this.physics.add.sprite(256, 256, 'player');
         this.player.setScale(0.5);
         this.player.setCollideWorldBounds(true);
@@ -173,46 +150,6 @@ export class Game extends Scene {
             this.player.body.setSize(newBodyWidth, newBodyHeight);
             this.player.body.setOffset((256 - newBodyWidth) / 2, (256 - newBodyHeight) / 2);
         }
-<<<<<<< HEAD
-    
-        const npcPositions = [
-            { x: 400, y: 256 },
-            { x: 500, y: 300 },
-            { x: 600, y: 256 },
-        ];
-    
-        let nextNpcId = 0;
-    
-        npcPositions.forEach((pos, index) => {
-            if (this.npcs[index]?.defeated) {
-                console.log(`Skipping NPC ${index} (already defeated).`);
-                return; // Skip NPC creation
-            }
-    
-            const sprite = this.physics.add.sprite(pos.x, pos.y, 'npc');
-            sprite.setOrigin(0.5, 0.5);
-            sprite.setImmovable(true);
-            sprite.setScale(0.2);
-            if (sprite.body) {
-                sprite.body.setSize(32, 32);
-            }
-    
-            const npcData: NPCData = {
-                id: nextNpcId++, // Assign unique ID
-                sprite,
-                interacted: false,
-                health: 100,
-                defeated: false,
-            };
-    
-            this.physics.add.overlap(this.player, sprite, () => {
-                this.handleNpcOverlap(npcData);
-            });
-    
-            this.npcs.push(npcData);
-        });
-    
-=======
 
         this.physics.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body, up: boolean, down: boolean, left: boolean, right: boolean) => {
             if (body.gameObject === this.player) {
@@ -223,7 +160,6 @@ export class Game extends Scene {
         // Initialize NPCs with random positions
         this.spawnNPCs();
 
->>>>>>> c85d15c80e7479d6c090871931e0a2d203b6db8d
         if (this.input.keyboard) {
             this.cursors = this.input.keyboard.createCursorKeys();
             this.wasd = {
