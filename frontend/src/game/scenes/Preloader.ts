@@ -49,6 +49,8 @@ export class Preloader extends Scene
         this.load.audio('game_start', 'soundtrack/soundeffect_game_start.mp3');
         this.load.audio('heal', 'soundtrack/soundeffect_heal.mp3');
         this.load.audio('start_dialogue', 'soundtrack/soundeffect_start_dialogue.mp3');
+        this.load.audio('combat_heal', 'soundtrack/soundeffect_combat_heal.mp3');
+        this.load.audio('special_attack', 'soundtrack/soundeffect_special_attack.mp3');
     }
 
     create ()
