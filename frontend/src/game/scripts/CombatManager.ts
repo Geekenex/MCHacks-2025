@@ -8,9 +8,6 @@ export interface npc {
   healthBar?: Phaser.GameObjects.Graphics;
 }
 
-const DAMAGE_TAKEN = 10;
-const DAMAGE_DEALT = 100;
-
 export class CombatManager {
   private scene: Phaser.Scene;
   private npc: npc;
@@ -48,6 +45,7 @@ export class CombatManager {
 
     try {
       const output = await client.runFlow(`${import.meta.env.VITE_COMBAT_FLOW_ID}`, {
+        recipient: "josephambayec76@gmail.com",
         prompt: `Create 3 abilities for this prompt: ${promptText}`,
       });
 
@@ -85,54 +83,64 @@ export class CombatManager {
     }
   }
 
-  playerAction(type: 'attack' | 'defend' | 'special') {
+  public playerAction(actionName: string) {
     if (!this.isPlayerTurn) return;
 
-    switch (type) {
-      case 'attack':
+    const action = this.menuOptions.find((opt) => opt.name === actionName);
+    if (!action) return;
+
+    let actionLog = '';
+
+    switch (action.type) {
+      case 'offense':
         this.npc.health -= 15;
+        actionLog = `Player used ${actionName} and dealt 15 damage to the enemy!`;
         break;
-      case 'defend':
+      case 'defense':
         this.playerHP += 10;
+        actionLog = `Player used ${actionName} and healed 10 HP!`;
         break;
-      case 'special':
+      case 'wacky':
         this.npc.health -= 25;
+        actionLog = `Player used ${actionName} and dealt 25 damage to the enemy!`;
         break;
     }
 
     this.updateHealthBar();
     this.checkCombatOutcome();
     this.isPlayerTurn = false; // Switch to NPC's turn
+
+    this.scene.events.emit('playerAction', actionLog, this.npc.health);
   }
 
-  npcAction(): string {
-    if (this.isPlayerTurn) return '';
+  npcAction() {
+    if (this.isPlayerTurn) return ''; // Ensure NPC action happens only on its turn
 
     const randomIndex = Math.floor(Math.random() * this.menuOptions.length);
     const selectedAction = this.menuOptions[randomIndex];
     let actionLog = '';
 
     switch (selectedAction.type) {
-      case 'offense':
-        this.playerHP -= 15;
-        actionLog = `Enemy used ${selectedAction.name}! Player takes 20 damage.`;
-        break;
-      case 'defense':
-        this.npc.health += 10;
-        this.updateHealthBar();
-        actionLog = `Enemy used ${selectedAction.name}! Enemy heals 10 HP.`;
-        break;
-      case 'wacky':
-        this.playerHP -= 25;
-        actionLog = `Enemy used ${selectedAction.name}! Player takes 30 damage.`;
-        break;
+        case 'offense':
+            this.playerHP -= 15;
+            actionLog = `Enemy used ${selectedAction.name} and dealt 15 damage!`;
+            break;
+        case 'defense':
+            this.npc.health += 10;
+            this.updateHealthBar();
+            actionLog = `Enemy used ${selectedAction.name} and healed 10 HP!`;
+            break;
+        case 'wacky':
+            this.playerHP -= 25;
+            actionLog = `Enemy used ${selectedAction.name} and dealt 25 damage!`;
+            break;
     }
 
     this.isPlayerTurn = true; // Switch back to player's turn
-    this.scene.events.emit('npcAction', actionLog, this.playerHP);
+    this.scene.events.emit('npcAction', actionLog, this.playerHP); // Emit only once
     this.checkCombatOutcome();
-    return actionLog;
-  }
+}
+
 
   private checkCombatOutcome() {
     if (this.npc.health <= 0) {
