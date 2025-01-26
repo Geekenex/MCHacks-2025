@@ -43,7 +43,9 @@ export class MainMenu extends Scene
 
                 if (input) {
                     console.log('User Input:', input);
-                    this.sendToAPI(input);
+                    // this.sendToAPI(input);
+                    //start game scene w prompt
+                    this.changeScene(input);
                 } else {
                     alert('Please enter a prompt before starting the game.');
                 }
@@ -52,34 +54,34 @@ export class MainMenu extends Scene
 
         EventBus.emit('current-scene-ready', this);
     }
-    sendToAPI(input: string) {
-        const client = new GumloopClient({
-            apiKey: `${import.meta.env.VITE_API_KEY}`,
-            userId: `${import.meta.env.VITE_USER_ID}`,
-          });
-            // Run a flow and wait for outputs
-            async function runFlow() {
-                try {
-                  const output = await client.runFlow(`${import.meta.env.VITE_FLOW_ID}`, {
-                    recipient: "killian.hedou@gmail.com",
+    // sendToAPI(input: string) {
+    //     const client = new GumloopClient({
+    //         apiKey: `${import.meta.env.VITE_API_KEY}`,
+    //         userId: `${import.meta.env.VITE_USER_ID}`,
+    //       });
+    //         // Run a flow and wait for outputs
+    //         async function runFlow() {
+    //             try {
+    //               const output = await client.runFlow(`${import.meta.env.VITE_FLOW_ID}`, {
+    //                 recipient: "killian.hedou@gmail.com",
                     
-                    prompt: input
+    //                 prompt: input
                     
-                  });
+    //               });
               
-                  console.log(output);
-                } catch (error) {
-                  console.error("Flow execution failed:", error);
-                }
-              }
+    //               console.log(output);
+    //             } catch (error) {
+    //               console.error("Flow execution failed:", error);
+    //             }
+    //           }
               
-        // runFlow();
-        //navigate to game scene
-        this.changeScene();
-    }
+    //     // runFlow();
+    //     //navigate to game scene
+    //     // this.changeScene();
+    // }
 
     
-    changeScene ()
+    changeScene (input: String)
     {
         if (this.logoTween)
         {
@@ -87,7 +89,7 @@ export class MainMenu extends Scene
             this.logoTween = null;
         }
 
-        this.scene.start('Game');
+        this.scene.start('Game', { input });
     }
 
     moveLogo (vueCallback: ({ x, y }: { x: number, y: number }) => void)

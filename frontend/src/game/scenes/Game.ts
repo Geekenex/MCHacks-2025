@@ -2,6 +2,7 @@ import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 import { WorldManager } from '../scripts/WorldManager';
 import { DialogueManager, DialogueLine } from '../scripts/DialogueManager';
+import { GumloopClient } from "gumloop";
 
 interface NPCData {
     id: number;
@@ -16,6 +17,7 @@ interface GameInitData {
     playerHP?: number;
     npcIndexToRemove?: number;
     npcWasKilled?: boolean;
+    input?: string;
 }
 
 export class Game extends Scene {
@@ -32,9 +34,11 @@ export class Game extends Scene {
     dialogue: { speaker: string; text: string }[] = [];
     currentLineIndex: number;
     dialogueActive: boolean;
+    dialogueLines: DialogueLine[] = [];
     dialogueBox: Phaser.GameObjects.Rectangle;
     dialogueText: Phaser.GameObjects.Text;
     private isTransitioning: boolean = false;
+    inputPrompt: String;
 
     constructor() {
         super('Game');
@@ -48,6 +52,12 @@ export class Game extends Scene {
         }
 
         this.isInCombat = false;
+
+        if (data.input) {
+          console.log(`Received input from MainMenu: ${data.input}`);
+          this.generateNewDialogue(data.input);
+          this.inputPrompt = data.input;
+      }
 
         if (data.npcWasKilled && data.npcIndexToRemove !== undefined) {
             const npcToRemove = this.npcs[data.npcIndexToRemove];
@@ -67,11 +77,58 @@ export class Game extends Scene {
         this.load.image('background1', 'assets/background1.png');
     }
 
+    generateNewDialogue(input: String)  {
+      const client = new GumloopClient({
+        apiKey: `${import.meta.env.VITE_API_KEY}`,
+        userId: `${import.meta.env.VITE_USER_ID}`,
+    });
+
+    const runFlow = async () => {
+        try {
+            const output = await client.runFlow(`${import.meta.env.VITE_FLOW_ID}`, {
+                prompt: input,
+            });
+
+            const responseString = output.response;
+            const jsonStart = responseString.indexOf('```json\n') + 8;
+            const jsonEnd = responseString.indexOf('\n```', jsonStart);
+            const jsonString = responseString.slice(jsonStart, jsonEnd);
+
+            const dialogueLines: DialogueLine[] = JSON.parse(jsonString);
+            console.log('Dialogue lines:', dialogueLines);
+            this.dialogueLines = dialogueLines;
+        } catch (error) {
+            console.error("Failed to generate dialogue:", error);
+        }
+    };
+
+    runFlow();
+
+    }
+
+
+    updateDialogue() {
+      this.dialogueManager = new DialogueManager(this, this.dialogueLines, () => {
+        if (this.currentNpc) {
+            this.isInCombat = true;
+  
+            const npcIndex = this.npcs.indexOf(this.currentNpc);
+            console.log(`Starting CombatScene with NPC Index: ${npcIndex}`);
+            this.scene.start('CombatScene', {
+                playerHP: this.playerHP,
+                npcIndex: npcIndex,
+                npcData: { health: this.currentNpc.health }, 
+            });
+            this.generateNewDialogue(this.inputPrompt);
+        }
+      });
+    }
+
     create() {
         this.handleAnimations();
 
         this.player = this.physics.add.sprite(256, 256, 'player');
-        this.player.setScale(0.5); // Scale down to 128x128
+        this.player.setScale(0.5);
         this.player.setCollideWorldBounds(true);
         this.player.play('idle-down');
         this.physics.world.enable(this.player);
@@ -136,26 +193,14 @@ export class Game extends Scene {
             };
         }
 
-        const lines: DialogueLine[] = [
-            { speaker: 'Player', text: 'Hello, NPC!' },
-            { speaker: 'NPC', text: 'Hello, Player!' },
-            { speaker: 'Player', text: 'Shall we battle?' },
-            { speaker: 'NPC', text: 'Yes, let\'s do it!' },
-        ];
+        // const lines: DialogueLine[] = [
+        //     { speaker: 'Player', text: 'Hello, NPC!' },
+        //     { speaker: 'NPC', text: 'Hello, Player!' },
+        //     { speaker: 'Player', text: 'Shall we battle?' },
+        //     { speaker: 'NPC', text: 'Yes, let\'s do it!' },
+        // ];
 
-        this.dialogueManager = new DialogueManager(this, lines, () => {
-            if (this.currentNpc) {
-                this.isInCombat = true;
-
-                const npcIndex = this.npcs.indexOf(this.currentNpc);
-                console.log(`Starting CombatScene with NPC Index: ${npcIndex}`);
-                this.scene.start('CombatScene', {
-                    playerHP: this.playerHP, // pass current player HP
-                    npcIndex: npcIndex,
-                    npcData: { health: this.currentNpc.health }, // pass NPC data
-                });
-            }
-        });
+        this.updateDialogue();
 
         this.dialogueBox = this.add.rectangle(0, this.scale.height - 80, this.scale.width, 80, 0x000000, 1).setOrigin(0, 0);
         this.dialogueBox.setVisible(false);
@@ -211,10 +256,18 @@ export class Game extends Scene {
     private handleNpcOverlap(npc: NPCData) {
         if (npc.interacted || this.dialogueManager.isDialogueActive()) return;
 
+        if (!this.dialogueLines || this.dialogueLines.length === 0) {
+          console.warn("No dialogue lines available for this NPC.");
+          return;
+      }
+
+      
+      
         npc.interacted = true;
         this.currentNpc = npc;
 
         console.log(`Player interacted with NPC. Starting dialogue.`);
+        this.updateDialogue();
         this.dialogueManager.startDialogue();
     }
 

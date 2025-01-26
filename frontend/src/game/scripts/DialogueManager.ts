@@ -14,6 +14,7 @@ export class DialogueManager {
 
   private dialogueBox: Phaser.GameObjects.Graphics;
   private dialogueText: Phaser.GameObjects.Text;
+  private enterKey: Phaser.Input.Keyboard.Key;
 
   constructor(
     scene: Phaser.Scene,
@@ -21,7 +22,7 @@ export class DialogueManager {
     onDialogueComplete?: () => void
   ) {
     this.scene = scene;
-    this.lines = lines;
+    this.lines = lines || [];
     this.onDialogueComplete = onDialogueComplete;
     this.currentLineIndex = 0;
     this.dialogueActive = false;
@@ -48,6 +49,21 @@ export class DialogueManager {
     });
     this.dialogueText.setDepth(1001);
     this.dialogueText.setVisible(false);
+    
+
+    if (this.scene.input && this.scene.input.keyboard) {
+      this.enterKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    }
+    this.enterKey.on('down', () => {
+      if (!this.dialogueActive) return;
+      this.currentLineIndex++;
+      if (this.currentLineIndex >= this.lines.length) {
+        this.endDialogue();
+      } else {
+        const currentLine = this.lines[this.currentLineIndex];
+        this.dialogueText.setText(`${currentLine.speaker}: ${currentLine.text}`);
+      }
+    });
 
     this.scene.input.on('pointerdown', () => {
       if (!this.dialogueActive) return;
@@ -61,13 +77,20 @@ export class DialogueManager {
   }
 
   public startDialogue() {
+    if (!this.lines || this.lines.length === 0) {
+        console.warn('No dialogue lines available to start.');
+        return;
+    }
+
     this.dialogueActive = true;
     this.currentLineIndex = 0;
 
+    const currentLine = this.lines[this.currentLineIndex];
     this.dialogueBox.setVisible(true);
-    this.dialogueText.setText(this.lines[this.currentLineIndex].text);
+    this.dialogueText.setText(`${currentLine.speaker}: ${currentLine.text}`);
     this.dialogueText.setVisible(true);
-  }
+}
+
 
   private endDialogue() {
     this.dialogueActive = false;
