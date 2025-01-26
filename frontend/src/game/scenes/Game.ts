@@ -460,6 +460,12 @@ private spawnNPCs(numberOfNPCs: number): void {
 
         this.clearAllNPCs();
 
+        if (this.potion) {
+            this.potion.destroy();
+            this.potion = undefined;
+        }
+    
+
         Game.npcsState = [];
         console.log(`Game state cleared for the new area.`);
         
@@ -520,34 +526,42 @@ private spawnNPCs(numberOfNPCs: number): void {
     private potion?: Phaser.Physics.Arcade.Sprite;
 
     private spawnPotion() {
+        // Clear any existing potion before spawning a new one
+        if (this.potion) {
+            this.potion.destroy();
+            this.potion = undefined;
+        }
+    
         const chance = Phaser.Math.Between(1, 100);
-        if (chance <= 30) { // 30% chance
+        if (chance <= 30) { // 30% chance to spawn a potion
             const x = Phaser.Math.Between(50, this.scale.width - 50);
             const y = Phaser.Math.Between(50, this.scale.height - 50);
-
-            // Create the potion sprite
+    
+            // Create a new potion sprite
             this.potion = this.physics.add.sprite(x, y, 'potion');
             this.potion.setOrigin(0.5, 0.5).setScale(0.07).setImmovable(true);
-
+    
             // Enable player overlap with the potion
             this.physics.add.overlap(this.player, this.potion, this.collectPotion as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
-
+    
             console.log(`Potion spawned at (${x}, ${y}).`);
+        } else {
+            console.log("No potion spawned this time.");
         }
     }
-
-    private collectPotion(player: Phaser.GameObjects.GameObject, potion: Phaser.GameObjects.GameObject) {
+    
+    private collectPotion(player: Phaser.Physics.Arcade.Sprite, potion: Phaser.Physics.Arcade.Sprite) {
         potion.destroy(); // Remove the potion
         this.potion = undefined;
-
+    
         // Heal the player
         this.playerHPInstance = Math.min(this.playerHPInstance + 20, 100); // Max HP is 100
         Game.playerHP = this.playerHPInstance;
-
+    
         console.log(`Potion collected! Player healed to ${this.playerHPInstance} HP.`);
     }
 
-    /**
+    /** Phaser.Types.Physics.Arcade.ArcadePhysicsCallback
      * Sets up player animations.
      */
     private handleAnimations() {
