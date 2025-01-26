@@ -1,8 +1,7 @@
 import { GameObjects, Scene } from 'phaser';
 
 import { EventBus } from '../EventBus';
-
-import { GumloopClient } from "gumloop";
+import { WorldManager } from '../scripts/WorldManager';
 
 //env vars
 import.meta.env.VITE_API_KEY;
@@ -24,7 +23,7 @@ export class MainMenu extends Scene
         super('MainMenu');
     }
 
-    create ()
+    async create ()
     {
         this.background = this.add.image(512, 384, 'background');
 
@@ -36,7 +35,7 @@ export class MainMenu extends Scene
 
         // Add event listener to the button
         inputElement.addListener('click');
-        inputElement.on('click', (event: any) => {
+        inputElement.on('click', async (event: any) => {
             if (event.target.id === 'start-button') {
                 
                 const input = (document.getElementById('prompt-input') as HTMLInputElement).value;
@@ -45,6 +44,11 @@ export class MainMenu extends Scene
                     console.log('User Input:', input);
                     // this.sendToAPI(input);
                     //start game scene w prompt
+                    await Promise.all([
+                        WorldManager.init(input),
+                    ]);
+                    this.background = this.add.image(512, 384, this.textures.get(WorldManager.maps.currentMap));
+
                     this.changeScene(input);
                 } else {
                     alert('Please enter a prompt before starting the game.');
@@ -52,34 +56,9 @@ export class MainMenu extends Scene
             }
         });
 
+
         EventBus.emit('current-scene-ready', this);
     }
-    // sendToAPI(input: string) {
-    //     const client = new GumloopClient({
-    //         apiKey: `${import.meta.env.VITE_API_KEY}`,
-    //         userId: `${import.meta.env.VITE_USER_ID}`,
-    //       });
-    //         // Run a flow and wait for outputs
-    //         async function runFlow() {
-    //             try {
-    //               const output = await client.runFlow(`${import.meta.env.VITE_FLOW_ID}`, {
-    //                 recipient: "killian.hedou@gmail.com",
-                    
-    //                 prompt: input
-                    
-    //               });
-              
-    //               console.log(output);
-    //             } catch (error) {
-    //               console.error("Flow execution failed:", error);
-    //             }
-    //           }
-              
-    //     // runFlow();
-    //     //navigate to game scene
-    //     // this.changeScene();
-    // }
-
     
     changeScene (input: String)
     {

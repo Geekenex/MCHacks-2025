@@ -19,7 +19,7 @@ function App()
             
             if (scene)
             {
-                scene.changeScene();
+                scene.changeScene("");
             }
         }
     }

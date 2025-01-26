@@ -103,7 +103,6 @@ export class Game extends Scene {
     preload() {
         this.load.spritesheet('player', 'assets/player.png', { frameWidth: 256, frameHeight: 256 });
         this.load.spritesheet('npc', 'assets/npc.png', { frameWidth: 512, frameHeight: 512 });
-        this.load.image('background1', 'assets/background1.png');
     }
 
     generateNewDialogue(input: String)  {
@@ -157,7 +156,7 @@ export class Game extends Scene {
         });
     }
 
-    create() {
+    async create() {
         this.handleAnimations();
 
         // Initialize player at provided position or default
@@ -178,9 +177,9 @@ export class Game extends Scene {
         }
 
         // Handle World Bounds for Transitions
-        this.physics.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body, up: boolean, down: boolean, left: boolean, right: boolean) => {
+        this.physics.world.on('worldbounds', async (body: Phaser.Physics.Arcade.Body, up: boolean, down: boolean, left: boolean, right: boolean) => {
             if (body.gameObject === this.player) {
-                this.handleTransition(up, down, left, right);
+                await this.handleTransition(up, down, left, right);
             }
         });
 
@@ -458,15 +457,21 @@ private spawnNPCs(numberOfNPCs: number): void {
 
         Game.npcsState = [];
         console.log(`Game state cleared for the new area.`);
+        
+        const image = new Image();
+        image.src = `data:image/png;base64,${WorldManager.maps[direction]}`;
+        image.onload = () => {
+            this.textures.addImage(WorldManager.maps[direction], image);
+        };
 
-        WorldManager.generateMaps(direction);
 
         this.cameras.main.fadeOut(500, 0, 0, 0);
 
         if (this.player.body) this.player.body.checkCollision.none = true;
 
+
         this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.background.setTexture(WorldManager.maps.currentMap);
+            this.background.setTexture(WorldManager.maps[direction]);
 
             if (direction === 'leftMap') {
                 this.player.x = gameWidth - bufferX;
@@ -493,6 +498,7 @@ private spawnNPCs(numberOfNPCs: number): void {
 
             this.cameras.main.fadeIn(500, 0, 0, 0);
             this.isTransitioning = false;
+            WorldManager.generateMaps(direction);
         });
     }
 
@@ -516,7 +522,8 @@ private spawnNPCs(numberOfNPCs: number): void {
     private handleAnimations() {
         this.camera = this.cameras.main;
         this.camera.setBackgroundColor(0);
-        this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, 'background1').setAlpha(1);
+        console.log(WorldManager.maps.currentMap);
+        this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, WorldManager.maps.currentMap).setAlpha(1);
 
         this.anims.create({
             key: 'down',
