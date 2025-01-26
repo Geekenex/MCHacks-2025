@@ -2,8 +2,16 @@ import { GameObjects, Scene } from 'phaser';
 
 import { EventBus } from '../EventBus';
 
+import { GumloopClient } from "gumloop";
+
+//env vars
+import.meta.env.VITE_API_KEY;
+import.meta.env.VITE_USER_ID;
+import.meta.env.VITE_FLOW_ID;
+
 export class MainMenu extends Scene
 {
+
 
 
     background: GameObjects.Image;
@@ -22,11 +30,6 @@ export class MainMenu extends Scene
 
         this.logo = this.add.image(512, 300, 'logo').setDepth(100);
 
-        // this.title = this.add.text(512, 460, 'Main Menu', {
-        //     fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
-        //     stroke: '#000000', strokeThickness: 8,
-        //     align: 'center'
-        // }).setOrigin(0.5).setDepth(100);
 
         //input n button
         const inputElement = this.add.dom(512, 400).createFromCache('initialPromptInput');
@@ -40,7 +43,9 @@ export class MainMenu extends Scene
 
                 if (input) {
                     console.log('User Input:', input);
-                    this.sendToAPI(input);
+                    // this.sendToAPI(input);
+                    //start game scene w prompt
+                    this.changeScene(input);
                 } else {
                     alert('Please enter a prompt before starting the game.');
                 }
@@ -49,26 +54,34 @@ export class MainMenu extends Scene
 
         EventBus.emit('current-scene-ready', this);
     }
-    sendToAPI(input: string) {
-        fetch('https://example.com/api', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ prompt: input }),
-        })
-            .then((response) => response.json())
-            .then((data) => {
-                console.log('API Response:', data);
-                this.scene.start('Game');
-            })
-            .catch((error) => {
-                console.error('Error sending to API:', error);
-            });
-    }
+    // sendToAPI(input: string) {
+    //     const client = new GumloopClient({
+    //         apiKey: `${import.meta.env.VITE_API_KEY}`,
+    //         userId: `${import.meta.env.VITE_USER_ID}`,
+    //       });
+    //         // Run a flow and wait for outputs
+    //         async function runFlow() {
+    //             try {
+    //               const output = await client.runFlow(`${import.meta.env.VITE_FLOW_ID}`, {
+    //                 recipient: "killian.hedou@gmail.com",
+                    
+    //                 prompt: input
+                    
+    //               });
+              
+    //               console.log(output);
+    //             } catch (error) {
+    //               console.error("Flow execution failed:", error);
+    //             }
+    //           }
+              
+    //     // runFlow();
+    //     //navigate to game scene
+    //     // this.changeScene();
+    // }
 
     
-    changeScene ()
+    changeScene (input: String)
     {
         if (this.logoTween)
         {
@@ -76,7 +89,7 @@ export class MainMenu extends Scene
             this.logoTween = null;
         }
 
-        this.scene.start('Game');
+        this.scene.start('Game', { input });
     }
 
     moveLogo (vueCallback: ({ x, y }: { x: number, y: number }) => void)
