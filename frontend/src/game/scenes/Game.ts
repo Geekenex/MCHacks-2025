@@ -509,10 +509,13 @@ private spawnNPCs(numberOfNPCs: number): void {
         Game.npcsState = [];
         console.log(`Game state cleared for the new area.`);
         
+        WorldManager.generateMaps(direction);
         const image = new Image();
         image.src = `data:image/png;base64,${WorldManager.maps[direction]}`;
+        let texture_set = false;
         image.onload = () => {
             this.textures.addImage(WorldManager.maps[direction], image);
+            texture_set = true;
         };
 
 
@@ -522,6 +525,8 @@ private spawnNPCs(numberOfNPCs: number): void {
 
 
         this.cameras.main.once('camerafadeoutcomplete', () => {
+            while(!texture_set); // Wait for the texture to be set
+
             this.background.setTexture(WorldManager.maps[direction]);
 
             if (direction === 'leftMap') {
@@ -549,7 +554,6 @@ private spawnNPCs(numberOfNPCs: number): void {
 
             this.cameras.main.fadeIn(500, 0, 0, 0);
             this.isTransitioning = false;
-            WorldManager.generateMaps(direction);
         });
     }
 

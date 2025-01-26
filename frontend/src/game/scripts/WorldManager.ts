@@ -47,13 +47,14 @@ export class WorldManager {
   }
   
 
-  static async generateMaps(nextPage: keyof typeof this.maps) {
+  static generateMaps(nextPage: keyof typeof this.maps) {
       const nextMap = this.maps[nextPage];
       this.maps.currentMap = nextMap;
 
       // Assign adjacent maps dynamically
-      this.maps[nextPage] = await this.generateMap()
-
+      Promise.resolve(this.generateMap()).then((map) => {
+          this.maps[nextPage] = map;
+      });
   }
 
   static async  generateMap(): Promise<string> {
