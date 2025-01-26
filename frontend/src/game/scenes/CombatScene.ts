@@ -24,6 +24,7 @@ export class CombatScene extends Phaser.Scene {
 
   private actionNames: string[] = ['Attack', 'Defend', 'Special'];
   private selectedIndex = 0;
+  private turnInProgress: boolean = false; // Prevent duplicate actions during a turn
 
   constructor() {
     super('CombatScene');
@@ -70,7 +71,7 @@ export class CombatScene extends Phaser.Scene {
         health: this.npcData.health,
       },
       this.playerHP,
-      this.updateCombatLog.bind(this)
+      this.handleCombatEnd.bind(this)
     );
 
     this.combatManager.startCombat(this.prompt, (menuOptions) => {
@@ -78,7 +79,8 @@ export class CombatScene extends Phaser.Scene {
       this.createCombatMenu();
     });
 
-    this.events.on('npcAction', this.handleNPCAction, this); // Listen for NPC actions
+    this.events.on('npcAction', this.handleNPCAction, this);
+    this.events.on('playerAction', this.handlePlayerAction, this);
   }
 
   private createCombatMenu() {
@@ -134,7 +136,6 @@ export class CombatScene extends Phaser.Scene {
 
   private highlightSelectedOption() {
     const menuItems = this.combatMenu.getAll().filter((child) => child instanceof Phaser.GameObjects.Text);
-
     const actionTexts = menuItems.filter((_, index) => index % 2 === 0);
 
     actionTexts.forEach((child, index) => {
@@ -147,49 +148,75 @@ export class CombatScene extends Phaser.Scene {
 
   private handleKeyboardInput() {
     this.input.keyboard?.on('keydown-W', () => {
+      if (this.turnInProgress) return; // Prevent input during NPC's turn
       this.selectedIndex = (this.selectedIndex - 1 + this.actionNames.length) % this.actionNames.length;
       this.highlightSelectedOption();
     });
 
     this.input.keyboard?.on('keydown-S', () => {
+      if (this.turnInProgress) return;
       this.selectedIndex = (this.selectedIndex + 1) % this.actionNames.length;
       this.highlightSelectedOption();
     });
 
     this.input.keyboard?.on('keydown-ENTER', () => {
+      if (this.turnInProgress) return;
       const selectedAction = this.actionNames[this.selectedIndex];
       this.handleCombatOption(selectedAction);
     });
   }
 
   private handleCombatOption(option: string) {
+    if (this.turnInProgress) return;
+    this.turnInProgress = true;
+
     switch (option) {
       case this.actionNames[0]:
         this.combatManager.playerAction('attack');
-        this.addCombatLog(`Player used ${option}`);
+        this.addCombatLog(`Player attacked the NPC!`);
         break;
       case this.actionNames[1]:
         this.combatManager.playerAction('defend');
-        this.addCombatLog(`Player used ${option}`);
+        this.addCombatLog(`Player healed 10 HP!`);
         break;
       case this.actionNames[2]:
         this.combatManager.playerAction('special');
-        this.addCombatLog(`Player used ${option}`);
+        this.addCombatLog(`Player used a special attack!`);
         break;
     }
 
     this.updatePlayerHealthBar();
 
-    this.time.delayedCall(1000, () => {
+    this.time.delayedCall(1500, () => {
       const npcLog = this.combatManager.npcAction();
       if (npcLog) this.addCombatLog(npcLog);
+      this.turnInProgress = false;
     });
+  }
+
+  private handlePlayerAction(actionLog: string) {
+    this.addCombatLog(actionLog);
   }
 
   private handleNPCAction(actionLog: string, playerHP: number) {
     this.addCombatLog(actionLog);
     this.playerHP = playerHP;
     this.updatePlayerHealthBar();
+  }
+
+  private handleCombatEnd(result: { playerHP: number; npcWasKilled: boolean }) {
+    if (result.npcWasKilled) {
+      this.addCombatLog('Player won the battle!');
+    } else {
+      this.addCombatLog('Player lost the battle...');
+    }
+
+    this.time.delayedCall(2000, () => {
+      this.cameras.main.fadeOut(1000, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('Game', { playerPosition: this.playerPosition });
+      });
+    });
   }
 
   private createResultBox() {
@@ -210,15 +237,6 @@ export class CombatScene extends Phaser.Scene {
     });
 
     this.resultBox.add(resultText);
-  }
-
-  private updateCombatLog(message: { playerHP: number; npcWasKilled: boolean }) {
-    const resultText = this.resultBox.getAt(1) as Phaser.GameObjects.Text;
-
-    let logMessage = `Player HP: ${message.playerHP}\n`;
-    logMessage += message.npcWasKilled ? 'NPC defeated!' : 'NPC still alive!';
-
-    resultText.setText(`Combat Log:\n${logMessage}`);
   }
 
   private addCombatLog(message: string) {

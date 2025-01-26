@@ -8,9 +8,6 @@ export interface npc {
   healthBar?: Phaser.GameObjects.Graphics;
 }
 
-const DAMAGE_TAKEN = 10;
-const DAMAGE_DEALT = 100;
-
 export class CombatManager {
   private scene: Phaser.Scene;
   private npc: npc;
@@ -48,6 +45,7 @@ export class CombatManager {
 
     try {
       const output = await client.runFlow(`${import.meta.env.VITE_COMBAT_FLOW_ID}`, {
+        recipient: "josephambayec76@gmail.com",
         prompt: `Create 3 abilities for this prompt: ${promptText}`,
       });
 
@@ -88,21 +86,28 @@ export class CombatManager {
   playerAction(type: 'attack' | 'defend' | 'special') {
     if (!this.isPlayerTurn) return;
 
+    let actionLog = '';
+
     switch (type) {
       case 'attack':
         this.npc.health -= 15;
+        actionLog = `Player dealt 15 damage to the enemy!`;
         break;
       case 'defend':
         this.playerHP += 10;
+        actionLog = `Player healed 10 HP!`;
         break;
       case 'special':
         this.npc.health -= 25;
+        actionLog = `Player dealt 25 damage with a special attack!`;
         break;
     }
 
     this.updateHealthBar();
     this.checkCombatOutcome();
     this.isPlayerTurn = false; // Switch to NPC's turn
+
+    this.scene.events.emit('playerAction', actionLog, this.npc.health);
   }
 
   npcAction(): string {
@@ -115,16 +120,16 @@ export class CombatManager {
     switch (selectedAction.type) {
       case 'offense':
         this.playerHP -= 15;
-        actionLog = `Enemy used ${selectedAction.name}! Player takes 20 damage.`;
+        actionLog = `Enemy used ${selectedAction.name} and dealt 15 damage!`;
         break;
       case 'defense':
         this.npc.health += 10;
         this.updateHealthBar();
-        actionLog = `Enemy used ${selectedAction.name}! Enemy heals 10 HP.`;
+        actionLog = `Enemy used ${selectedAction.name} and healed 10 HP!`;
         break;
       case 'wacky':
         this.playerHP -= 25;
-        actionLog = `Enemy used ${selectedAction.name}! Player takes 30 damage.`;
+        actionLog = `Enemy used ${selectedAction.name} and dealt 25 damage!`;
         break;
     }
 
