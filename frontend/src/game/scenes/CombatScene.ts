@@ -7,6 +7,7 @@ interface ICombatData {
     health: number;
   };
   npcIndex: number;
+  prompt: string;
 }
 
 export class CombatScene extends Phaser.Scene {
@@ -15,6 +16,7 @@ export class CombatScene extends Phaser.Scene {
   private npcIndex: number;
   private combatManager: CombatManager;
   private npcSprite: Phaser.GameObjects.Sprite;
+  private prompt: string;
 
   constructor() {
     super('CombatScene');
@@ -24,6 +26,7 @@ export class CombatScene extends Phaser.Scene {
     this.playerHP = data.playerHP;
     this.npcData = data.npcData;
     this.npcIndex = data.npcIndex;
+    this.prompt = data.prompt;
   }
 
   preload() {
@@ -64,6 +67,6 @@ export class CombatScene extends Phaser.Scene {
     );
 
     // Start the battle
-    this.combatManager.startCombat();
+    this.combatManager.startCombat(this.prompt);
   }
 }

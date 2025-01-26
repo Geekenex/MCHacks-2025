@@ -118,6 +118,7 @@ export class Game extends Scene {
                 playerHP: this.playerHP,
                 npcIndex: npcIndex,
                 npcData: { health: this.currentNpc.health }, 
+                prompt: this.inputPrompt
             });
             this.generateNewDialogue(this.inputPrompt);
         }

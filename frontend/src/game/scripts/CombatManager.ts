@@ -1,3 +1,4 @@
+import { GumloopClient } from 'gumloop';
 import Phaser from 'phaser';
 
 interface NPCData {
@@ -11,11 +12,12 @@ const DAMAGE_TAKEN = 10;
 const DAMAGE_DEALT = 100;
 
 const COMBAT_TEXT_DELAY = 1600;
+
 export class CombatManager {
   private scene: Phaser.Scene;
   private npc: NPCData;
   private playerHP: number;
-  private menuOptions: string[] = ['Rock', 'Paper', 'Scissors'];
+  private menuOptions: { name: string; type: 'offense' | 'defense' | 'wacky' }[] = [];
   private currentSelection: number = 0;
   private menuTexts: Phaser.GameObjects.Text[] = [];
   private infoText: Phaser.GameObjects.Text;
@@ -33,6 +35,7 @@ export class CombatManager {
     npc: NPCData,
     playerHP: number,
     onCombatEnd: (result: { playerHP: number; npcWasKilled: boolean }) => void
+
   ) {
     this.scene = scene;
     this.npc = npc;
@@ -46,14 +49,44 @@ export class CombatManager {
     };
   }
 
-  public startCombat() {
+  public async startCombat(promptText: string) {
+    await this.fetchMenuOptionsFromGumloop(promptText);
     this.createHealthBar();
     this.createMenu();
     this.createInfoText();
     this.highlightSelection();
 
-    // We'll run handleInput on each update
     this.scene.events.on('update', this.handleInput, this);
+  }
+
+  private async fetchMenuOptionsFromGumloop(promptText: string) {
+    const client = new GumloopClient({
+      apiKey: `${import.meta.env.VITE_COMBAT_API_KEY}`,
+      userId: `${import.meta.env.VITE_COMBAT_USER_ID}`,
+    });
+
+    try {
+      const output = await client.runFlow(`${import.meta.env.VITE_COMBAT_FLOW_ID}`, {
+        recipient: "josephambayec76@gmail.com",
+        prompt: "Create 3 abilities off the following prompt, use your imagination as to what abilities what would be available for this theme of game: " + promptText,
+      });
+
+      const generatedOutput = JSON.parse(output.output);
+
+      this.menuOptions = [
+        { name: generatedOutput.offense, type: 'offense' },
+        { name: generatedOutput.defense, type: 'defense' },
+        { name: generatedOutput.wacky, type: 'wacky' },
+      ];
+    } catch (error) {
+      console.error("Failed to fetch menu options from Gumloop API:", error);
+
+      this.menuOptions = [
+        { name: "Basic Attack", type: 'offense' },
+        { name: "Defend", type: 'defense' },
+        { name: "Taunt", type: 'wacky' },
+      ];
+    }
   }
 
   private createHealthBar() {
@@ -77,13 +110,28 @@ export class CombatManager {
   private createMenu() {
     const startX = 100;
     const startY = 400;
+    const lineSpacing = 50; // Spacing between lines
 
     for (let i = 0; i < this.menuOptions.length; i++) {
-      const text = this.scene.add.text(startX, startY + i * 30, this.menuOptions[i], {
+      const option = this.menuOptions[i];
+
+      // Create the main attack name text
+      const nameText = this.scene.add.text(startX, startY + i * lineSpacing, option.name, {
         fontSize: '16px',
         color: '#ffffff',
       });
-      this.menuTexts.push(text);
+      this.menuTexts.push(nameText);
+
+      // Create the small "Type" label under the attack name
+      this.scene.add.text(
+        startX,
+        startY + i * lineSpacing + 20, // Slightly below the name
+        `Type: ${option.type.charAt(0).toUpperCase() + option.type.slice(1)}`, // Capitalize first letter
+        {
+          fontSize: '12px',
+          color: '#aaaaaa', // Grey for smaller text
+        }
+      );
     }
   }
 
@@ -119,13 +167,11 @@ export class CombatManager {
   }
 
   private executeAction() {
-    const playerChoice = this.menuOptions[this.currentSelection];
+    const playerChoice = this.menuOptions[this.currentSelection].name;
     this.showActionText(`Player chose ${playerChoice}!`, () => {
-      // NPC picks randomly
       const npcChoice = this.getRandomChoice();
-      this.showActionText(`NPC chose ${npcChoice}!`, () => {
-
-        const winner = this.determineWinner(playerChoice, npcChoice);
+      this.showActionText(`NPC chose ${npcChoice.name}!`, () => {
+        const winner = this.determineWinner(playerChoice, npcChoice.name);
         if (winner === 'player') {
           this.npc.health -= DAMAGE_DEALT;
           this.updateHealthBar();
@@ -134,7 +180,7 @@ export class CombatManager {
               this.endCombat(`NPC fainted!`);
               return;
             }
-            this.inActionText = false; //ready for next selection
+            this.inActionText = false;
           });
         } else if (winner === 'npc') {
           this.playerHP -= DAMAGE_TAKEN;
@@ -146,7 +192,6 @@ export class CombatManager {
             this.inActionText = false;
           });
         } else {
-          // draw
           this.showActionText(`It's a tie!`, () => {
             this.inActionText = false;
           });
@@ -168,45 +213,56 @@ export class CombatManager {
 
   private endCombat(message: string) {
     this.showActionText(message, () => {
-
       const npcWasKilled = this.npc.health <= 0;
-
       this.npc.sprite.destroy();
       this.npc.healthBar?.destroy();
-      this.menuTexts.forEach(t => t.destroy());
+      this.menuTexts.forEach((t) => t.destroy());
       this.scene.events.off('update', this.handleInput, this);
       this.infoText.destroy();
 
-      console.log(`Combat End: NPC Was Killed = ${npcWasKilled}, Player HP = ${this.playerHP}`);
-
-      // Pass back the updated playerHP and whether NPC was killed
       this.onCombatEnd({
         playerHP: this.playerHP,
-        npcWasKilled: npcWasKilled,
+        npcWasKilled,
       });
     });
   }
 
-  private getRandomChoice(): string {
-    const choices = ['Rock', 'Paper', 'Scissors'];
-    const randomIndex = Math.floor(Math.random() * choices.length);
-    return choices[randomIndex];
+  private getRandomChoice(): { name: string; type: 'offense' | 'defense' | 'wacky' } {
+    const randomIndex = Math.floor(Math.random() * this.menuOptions.length);
+    return this.menuOptions[randomIndex];
   }
 
   private determineWinner(
     playerChoice: string,
     npcChoice: string
   ): 'player' | 'npc' | 'draw' {
-    if (playerChoice === npcChoice) {
+    const beats = {
+      offense: 'wacky',
+      wacky: 'defense',
+      defense: 'offense',
+    };
+
+    const playerType = this.getAttackType(playerChoice);
+    const npcType = this.getAttackType(npcChoice);
+
+    if (playerType === npcType) {
       return 'draw';
     }
-    if (
-      (playerChoice === 'Rock' && npcChoice === 'Scissors') ||
-      (playerChoice === 'Paper' && npcChoice === 'Rock') ||
-      (playerChoice === 'Scissors' && npcChoice === 'Paper')
-    ) {
+
+    if (beats[playerType] === npcType) {
       return 'player';
     }
+
     return 'npc';
+  }
+
+  private getAttackType(choice: string): 'offense' | 'defense' | 'wacky' {
+    const option = this.menuOptions.find((opt) => opt.name === choice);
+    if (option) {
+      return option.type;
+    }
+
+    console.error(`Unrecognized attack: "${choice}". Defaulting to "wacky".`);
+    return 'wacky'; // Default fallback
   }
 }
