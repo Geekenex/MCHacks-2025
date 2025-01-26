@@ -210,10 +210,8 @@ export class Game extends Scene {
         this.physics.world.enable(this.player);
         if (this.player.body) {
             this.player.setCollideWorldBounds(true, 0, 0, true);
-            const newBodyWidth = 128;
-            const newBodyHeight = 128;
-            this.player.body.setSize(newBodyWidth, newBodyHeight);
-            this.player.body.setOffset((256 - newBodyWidth) / 2, (256 - newBodyHeight) / 2);
+            this.player.body.setSize(64, 64);
+            this.player.body.setOffset(32,32);
         }
 
         // Handle World Bounds for Transitions

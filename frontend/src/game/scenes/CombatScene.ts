@@ -65,12 +65,12 @@ export class CombatScene extends Phaser.Scene {
       .setDisplaySize(this.cameras.main.width, this.cameras.main.height);
 
     this.playerSprite = this.physics.add
-      .sprite(this.cameras.main.width - 800, this.cameras.main.height - 150, 'playerBattleSprite')
-      .setScale(0.6);
+      .sprite(this.cameras.main.width - 800, this.cameras.main.height - 150, 'player')
+      .setScale(1);
 
     this.npcSprite = this.physics.add
-      .sprite(this.cameras.main.width - 250, 350, 'npcBattleSprite')
-      .setScale(0.6);
+      .sprite(this.cameras.main.width - 250, 350, 'npc')
+      .setScale(0.5);
 
     this.createPlayerHealthBar();
     this.createResultBox();
