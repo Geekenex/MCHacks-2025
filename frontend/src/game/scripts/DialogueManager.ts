@@ -65,15 +65,15 @@ export class DialogueManager {
       }
     });
 
-    this.scene.input.on('pointerdown', () => {
-      if (!this.dialogueActive) return;
-      this.currentLineIndex++;
-      if (this.currentLineIndex >= this.lines.length) {
-        this.endDialogue();
-      } else {
-        this.dialogueText.setText(this.lines[this.currentLineIndex].text);
-      }
-    });
+    // this.scene.input.on('pointerdown', () => {
+    //   if (!this.dialogueActive) return;
+    //   this.currentLineIndex++;
+    //   if (this.currentLineIndex >= this.lines.length) {
+    //     this.endDialogue();
+    //   } else {
+    //     this.dialogueText.setText(this.lines[this.currentLineIndex].text);
+    //   }
+    // });
   }
 
   public startDialogue() {
