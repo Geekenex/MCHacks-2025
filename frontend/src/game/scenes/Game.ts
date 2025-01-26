@@ -15,12 +15,14 @@ interface NPCData {
 
 interface GameInitData {
     playerHP?: number;
-    npcIndexToRemove?: number;
+    npcIndexToRemove?: number; // Now represents NPC ID
     npcWasKilled?: boolean;
     input?: string;
 }
 
 export class Game extends Scene {
+    static nextNpcId: number = 0; // Static counter for unique NPC IDs
+
     camera: Phaser.Cameras.Scene2D.Camera;
     background: Phaser.GameObjects.Image;
     player: Phaser.Physics.Arcade.Sprite;
@@ -40,8 +42,11 @@ export class Game extends Scene {
     private isTransitioning: boolean = false;
     inputPrompt: String;
 
-    //buffer distance to avoid spawning NPCs too close to the player
+    // Buffer distance to avoid spawning NPCs too close to the player
     private npcSpawnBuffer: number = 150;
+
+    // Array to track globally defeated NPC IDs
+    defeatedNpcIds: number[] = [];
 
     constructor() {
         super('Game');
@@ -63,13 +68,15 @@ export class Game extends Scene {
         }
 
         if (data.npcWasKilled && data.npcIndexToRemove !== undefined) {
-            const npcToRemove = this.npcs[data.npcIndexToRemove];
+            const npcIdToRemove = data.npcIndexToRemove;
+            const npcToRemove = this.npcs.find(npc => npc.id === npcIdToRemove);
             if (npcToRemove) {
                 npcToRemove.sprite.destroy();
                 npcToRemove.defeated = true;
-                console.log(`NPC at index ${data.npcIndexToRemove} marked as defeated.`);
+                this.defeatedNpcIds.push(npcToRemove.id);
+                console.log(`NPC with ID ${npcToRemove.id} marked as defeated.`);
             } else {
-                console.warn(`No NPC found at index ${data.npcIndexToRemove}`);
+                console.warn(`No NPC found with ID ${npcIdToRemove}`);
             }
         }
     }
@@ -112,32 +119,33 @@ export class Game extends Scene {
     }
 
     updateDialogue() {
-      this.dialogueManager = new DialogueManager(this, this.dialogueLines, () => {
-        if (this.currentNpc) {
-            this.isInCombat = true;
-  
-            const npcIndex = this.npcs.indexOf(this.currentNpc);
-            console.log(`Starting CombatScene with NPC Index: ${npcIndex}`);
-            this.cameras.main.shake(2000, 0.01, true); // 2-second shake for the swirl effect
-            this.time.delayedCall(2000, () => {
-                this.scene.start('CombatScene', {
-                    playerHP: this.playerHP,
-                    npcIndex: npcIndex,
-                    npcData: { health: this.currentNpc!.health }, 
-                    prompt: this.inputPrompt,
-                    playerPosition: { x: this.player.x, y: this.player.y }
-                });
-            });
+        this.dialogueManager = new DialogueManager(this, this.dialogueLines, () => {
+            if (this.currentNpc) {
+                this.isInCombat = true;
 
-            this.generateNewDialogue(this.inputPrompt);
-        }
-      });
+                const npcIndex = this.npcs.indexOf(this.currentNpc);
+                console.log(`Starting CombatScene with NPC Index: ${npcIndex}`);
+                this.cameras.main.shake(2000, 0.01, true); // 2-second shake for the swirl effect
+                this.time.delayedCall(2000, () => {
+                    this.scene.start('CombatScene', {
+                        playerHP: this.playerHP,
+                        npcIndexToRemove: this.currentNpc!.id, // Pass NPC ID
+                        npcWasKilled: true,
+                        npcData: { health: this.currentNpc!.health  }, 
+                        prompt: this.inputPrompt,
+                        playerPosition: { x: this.player.x, y: this.player.y }
+                    });
+                });
+
+                this.generateNewDialogue(this.inputPrompt);
+            }
+        });
     }
 
     create() {
         this.handleAnimations();
-    
-        // Reset player to initial overworld position
+
+        // Initialize player at starting position
         this.player = this.physics.add.sprite(256, 256, 'player');
         this.player.setScale(0.5);
         this.player.setCollideWorldBounds(true);
@@ -157,8 +165,10 @@ export class Game extends Scene {
             }
         });
 
-        // Initialize NPCs with random positions
-        this.spawnNPCs();
+        // Determine initial number of NPCs to spawn (e.g., between 1 and 5)
+        const initialNumberOfNPCs = Phaser.Math.Between(1, 5);
+        console.log(`Spawning initial ${initialNumberOfNPCs} NPC(s).`);
+        this.spawnNPCs(initialNumberOfNPCs);
 
         if (this.input.keyboard) {
             this.cursors = this.input.keyboard.createCursorKeys();
@@ -223,6 +233,9 @@ export class Game extends Scene {
         }
     }
 
+    /**
+     * Generates a random position within the game bounds, ensuring it's outside the buffer zone around the player.
+     */
     private getRandomPosition(buffer: number = this.npcSpawnBuffer): {x: number, y: number} {
         const maxAttempts = 100;
         let attempts = 0;
@@ -255,17 +268,23 @@ export class Game extends Scene {
     }
 
     /**
-     * Initializes NPCs with random positions, avoiding the player's starting area.
+     * Spawns a specified number of NPCs with random positions, avoiding the player's starting area.
+     * @param numberOfNPCs - The number of NPCs to spawn.
      */
-    private spawnNPCs() {
-        const numberOfNPCs = 3;
-        let nextNpcId = this.npcs.length;
+    private spawnNPCs(numberOfNPCs: number) {
+        // Clear existing NPCs
+        this.npcs.forEach(npc => {
+            npc.sprite.destroy();
+        });
+        this.npcs = [];
 
         for (let i = 0; i < numberOfNPCs; i++) {
-            if (this.npcs[i] && !this.npcs[i].defeated) {
-                const newPos = this.getRandomPosition();
-                this.npcs[i].sprite.setPosition(newPos.x, newPos.y);
-                this.npcs[i].interacted = false;
+            // Assign unique IDs using the static counter
+            const npcId = Game.nextNpcId++;
+
+            // Skip spawning if the NPC ID is in the defeated list
+            if (this.defeatedNpcIds.includes(npcId)) {
+                console.log(`NPC ID ${npcId} is defeated. Skipping spawn.`);
                 continue;
             }
 
@@ -279,7 +298,7 @@ export class Game extends Scene {
             }
 
             const npcData: NPCData = {
-                id: nextNpcId++,
+                id: npcId, // Assign unique ID
                 sprite,
                 interacted: false,
                 health: 100,
@@ -292,19 +311,19 @@ export class Game extends Scene {
 
             this.npcs.push(npcData);
         }
+
+        console.log(`Spawned ${this.npcs.length} NPC(s) on the screen.`);
     }
 
     /**
      * Shuffles the positions of existing NPCs when new land is generated.
+     * Also determines a random number of NPCs to spawn (between 1 and 5).
      */
     private shuffleNPCPositions() {
-        this.npcs.forEach(npc => {
-            if (npc.defeated) return;
-
-            const newPos = this.getRandomPosition();
-            npc.sprite.setPosition(newPos.x, newPos.y);
-            npc.interacted = false;
-        });
+        // Determine a random number of NPCs to spawn
+        const numberOfNPCs = Phaser.Math.Between(1, 5);
+        console.log(`Shuffling NPC positions. Spawning ${numberOfNPCs} NPC(s).`);
+        this.spawnNPCs(numberOfNPCs);
     }
 
     private handleNpcOverlap(npc: NPCData) {
