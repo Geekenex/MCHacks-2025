@@ -140,15 +140,15 @@ export class Game extends Scene {
                 this.isInCombat = true;
 
                 console.log(`Starting CombatScene with NPC ID: ${this.currentNpc.id}`);
-                this.cameras.main.shake(2000, 0.01, true); // 2-second shake for the swirl effect
-                this.time.delayedCall(2000, () => {
+                this.cameras.main.shake(3000, 0.01, true);
+                this.time.delayedCall(3000, () => {
                     this.scene.start('CombatScene', {
                         playerHP: this.playerHPInstance,
-                        npcIndexToRemove: this.currentNpc!.id, // Pass NPC ID
+                        npcIndexToRemove: this.currentNpc!.id, 
                         npcWasKilled: true,
                         npcData: { health: this.currentNpc!.health },
                         prompt: this.inputPrompt,
-                        playerPosition: { x: this.player.x, y: this.player.y } // Pass player's current position
+                        playerPosition: { x: this.player.x, y: this.player.y } 
                     });
                 });
 
