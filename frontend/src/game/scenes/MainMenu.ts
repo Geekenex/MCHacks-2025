@@ -27,6 +27,8 @@ export class MainMenu extends Scene
     create ()
     {
         this.background = this.add.image(512, 384, 'background');
+         this.background.setTintFill(0xffe1e1, 0xf03c3c, 0xf03c3c, 0xf03c3c);
+
 
         this.backgroundMusic = this.sound.add('main_menu', { loop: true });
         this.backgroundMusic.play();

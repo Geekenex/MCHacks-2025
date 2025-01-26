@@ -65,7 +65,7 @@ export class CombatScene extends Phaser.Scene {
       .setDisplaySize(this.cameras.main.width, this.cameras.main.height);
 
     this.playerSprite = this.physics.add
-      .sprite(this.cameras.main.width - 800, this.cameras.main.height - 150, 'playerBattleSprite')
+      .sprite(this.cameras.main.width - 850, this.cameras.main.height - 75, 'playerBattleSprite')
       .setScale(0.6);
 
     this.npcSprite = this.physics.add
