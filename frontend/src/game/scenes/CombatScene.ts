@@ -210,7 +210,7 @@ export class CombatScene extends Phaser.Scene {
     if (this.turnInProgress || this.combatEnded) return;
     this.turnInProgress = true;
 
-    this.combatManager.playerAction(option);
+    this.combatManager.playerAction(option, this.sound);
 
     this.updatePlayerHealthBar();
 
@@ -289,8 +289,6 @@ export class CombatScene extends Phaser.Scene {
 
   private updateCombatLogUI() {
     const resultText = this.resultBox.getAt(1) as Phaser.GameObjects.Text;
-
-    this.sound.add('attack').play();
     const logText = ['Combat Log:', ...this.combatLogs.slice(-2)]
       .map((log) => `${log}`)
       .join('\n\n'); 
