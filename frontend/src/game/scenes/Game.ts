@@ -106,7 +106,6 @@ export class Game extends Scene {
     preload() {
         this.load.spritesheet('player', 'assets/player.png', { frameWidth: 256, frameHeight: 256 });
         this.load.spritesheet('npc', 'assets/npc.png', { frameWidth: 512, frameHeight: 512 });
-        this.load.image('background1', 'assets/background1.png');
     }
 
     generateNewDialogue(input: String)  {
@@ -163,7 +162,7 @@ export class Game extends Scene {
         });
     }
 
-    create() {
+    async create() {
         this.handleAnimations();
 
         const ambientTrack = Phaser.Math.RND.pick(['ambient_one', 'ambient_two']);
@@ -182,7 +181,9 @@ export class Game extends Scene {
         this.player = this.physics.add.sprite(startX, startY, 'player');
         this.player.setScale(0.5);
         this.player.setCollideWorldBounds(true);
+        this.player.setVisible(true);
         this.player.play('idle-down');
+        this.player.setDepth(1);
         this.physics.world.enable(this.player);
         if (this.player.body) {
             this.player.setCollideWorldBounds(true, 0, 0, true);
@@ -193,9 +194,9 @@ export class Game extends Scene {
         }
 
         // Handle World Bounds for Transitions
-        this.physics.world.on('worldbounds', (body: Phaser.Physics.Arcade.Body, up: boolean, down: boolean, left: boolean, right: boolean) => {
+        this.physics.world.on('worldbounds', async (body: Phaser.Physics.Arcade.Body, up: boolean, down: boolean, left: boolean, right: boolean) => {
             if (body.gameObject === this.player) {
-                this.handleTransition(up, down, left, right);
+                await this.handleTransition(up, down, left, right);
             }
         });
 
@@ -237,6 +238,27 @@ export class Game extends Scene {
         });
         this.dialogueText.setVisible(false);
 
+        // init background texture
+        const currentMapTextureKey = WorldManager.maps.currentMap;
+
+        // Ensure the texture is loaded before using it
+        if (!this.textures.exists(currentMapTextureKey)) {
+            const image = new Image();
+            image.src = `data:image/png;base64,${currentMapTextureKey}`;
+            image.onload = () => {
+                this.textures.addImage(currentMapTextureKey, image);
+                this.background.setTexture(currentMapTextureKey); // Set the background texture here
+            };
+        } else {
+            this.background = this.add.image(
+                this.scale.width / 2,
+                this.scale.height / 2,
+                currentMapTextureKey
+            ).setAlpha(1).setDepth(-1);
+        }
+
+
+        
         EventBus.emit('current-scene-ready', this);
         
     }
@@ -510,15 +532,25 @@ private spawnNPCs(numberOfNPCs: number): void {
         Game.npcsState = [];
         console.log(`Game state cleared for the new area.`);
         
-
         WorldManager.generateMaps(direction);
+        const image = new Image();
+        image.src = `data:image/png;base64,${WorldManager.maps[direction]}`;
+        let texture_set = false;
+        image.onload = () => {
+            this.textures.addImage(WorldManager.maps[direction], image);
+            texture_set = true;
+        };
+
 
         this.cameras.main.fadeOut(500, 0, 0, 0);
 
         if (this.player.body) this.player.body.checkCollision.none = true;
 
+
         this.cameras.main.once('camerafadeoutcomplete', () => {
-            this.background.setTexture(WorldManager.maps.currentMap);
+            while(!texture_set); // Wait for the texture to be set
+
+            this.background.setTexture(WorldManager.maps[direction]);
 
             if (direction === 'leftMap') {
                 this.player.x = gameWidth - bufferX;
@@ -610,55 +642,64 @@ private spawnNPCs(numberOfNPCs: number): void {
     private handleAnimations() {
         this.camera = this.cameras.main;
         this.camera.setBackgroundColor(0);
-        this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, 'background1').setAlpha(1);
+        console.log(WorldManager.maps.currentMap);
+        this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, WorldManager.maps.currentMap).setAlpha(1).setDepth(-1);
+        const animations = [
+            {
+                key: 'down',
+                frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
+                frameRate: 10,
+                repeat: -1,
+            },
+            {
+                key: 'left',
+                frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
+                frameRate: 10,
+                repeat: -1,
+            },
+            {
+                key: 'right',
+                frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
+                frameRate: 10,
+                repeat: -1,
+            },
+            {
+                key: 'up',
+                frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
+                frameRate: 10,
+                repeat: -1,
+            },
+            {
+                key: 'idle-down',
+                frames: [{ key: 'player', frame: 1 }],
+                frameRate: 1,
+                repeat: -1,
+            },
+            {
+                key: 'idle-left',
+                frames: [{ key: 'player', frame: 5 }],
+                frameRate: 1,
+                repeat: -1,
+            },
+            {
+                key: 'idle-right',
+                frames: [{ key: 'player', frame: 9 }],
+                frameRate: 1,
+                repeat: -1,
+            },
+            {
+                key: 'idle-up',
+                frames: [{ key: 'player', frame: 13 }],
+                frameRate: 1,
+                repeat: -1,
+            },
+        ];
+    
+        animations.forEach(({ key, frames, frameRate, repeat }) => {
+            if (!this.anims.exists(key)) {
+                this.anims.create({ key, frames, frameRate, repeat });
+            }
+        });
 
-        this.anims.create({
-            key: 'down',
-            frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'left',
-            frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'right',
-            frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'up',
-            frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'idle-down',
-            frames: [{ key: 'player', frame: 1 }],
-            frameRate: 1,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'idle-left',
-            frames: [{ key: 'player', frame: 5 }],
-            frameRate: 1,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'idle-right',
-            frames: [{ key: 'player', frame: 9 }],
-            frameRate: 1,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: 'idle-up',
-            frames: [{ key: 'player', frame: 13 }],
-            frameRate: 1,
-            repeat: -1,
-        });
     }
 }

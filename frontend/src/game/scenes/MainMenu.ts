@@ -1,7 +1,7 @@
 import { GameObjects, Scene } from 'phaser';
 
 import { EventBus } from '../EventBus';
-
+import { WorldManager } from '../scripts/WorldManager';
 
 //env vars
 import.meta.env.VITE_API_KEY;
@@ -24,7 +24,7 @@ export class MainMenu extends Scene
         super('MainMenu');
     }
 
-    create ()
+    async create ()
     {
         this.background = this.add.image(512, 384, 'background');
          this.background.setTintFill(0xffe1e1, 0xf03c3c, 0xf03c3c, 0xf03c3c);
@@ -41,7 +41,7 @@ export class MainMenu extends Scene
 
         // Add event listener to the button
         inputElement.addListener('click');
-        inputElement.on('click', (event: any) => {
+        inputElement.on('click', async (event: any) => {
             if (event.target.id === 'start-button') {
                 
                 const input = (document.getElementById('prompt-input') as HTMLInputElement).value;
@@ -50,12 +50,18 @@ export class MainMenu extends Scene
                     console.log('User Input:', input);
                     // this.sendToAPI(input);
                     //start game scene w prompt
+                    await Promise.all([
+                        WorldManager.init(input),
+                    ]);
+                    this.background = this.add.image(512, 384, this.textures.get(WorldManager.maps.currentMap));
+
                     this.changeScene(input);
                 } else {
                     alert('Please enter a prompt before starting the game.');
                 }
             }
         });
+
 
         EventBus.emit('current-scene-ready', this);
     }
