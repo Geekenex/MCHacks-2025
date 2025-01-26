@@ -159,6 +159,7 @@ export class Game extends Scene {
 
     create() {
         this.handleAnimations();
+        
 
         // Initialize player at provided position or default
         const startX = Game.playerPosition.x;
@@ -223,6 +224,7 @@ export class Game extends Scene {
         this.dialogueText.setVisible(false);
 
         EventBus.emit('current-scene-ready', this);
+        
     }
 
     update() {
@@ -403,6 +405,7 @@ private spawnNPCs(numberOfNPCs: number): void {
   }
 
   console.log(`Spawned ${this.npcs.length} NPC(s) on the screen.`);
+  this.spawnPotion();
 }
 
     /**
@@ -459,6 +462,7 @@ private spawnNPCs(numberOfNPCs: number): void {
 
         Game.npcsState = [];
         console.log(`Game state cleared for the new area.`);
+        
 
         WorldManager.generateMaps(direction);
 
@@ -509,6 +513,38 @@ private spawnNPCs(numberOfNPCs: number): void {
         });
         this.npcs = [];
         console.log(`All NPCs have been cleared from the game world.`);
+    }
+
+    
+
+    private potion?: Phaser.Physics.Arcade.Sprite;
+
+    private spawnPotion() {
+        const chance = Phaser.Math.Between(1, 100);
+        if (chance <= 30) { // 30% chance
+            const x = Phaser.Math.Between(50, this.scale.width - 50);
+            const y = Phaser.Math.Between(50, this.scale.height - 50);
+
+            // Create the potion sprite
+            this.potion = this.physics.add.sprite(x, y, 'potion');
+            this.potion.setOrigin(0.5, 0.5).setScale(0.07).setImmovable(true);
+
+            // Enable player overlap with the potion
+            this.physics.add.overlap(this.player, this.potion, this.collectPotion as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
+
+            console.log(`Potion spawned at (${x}, ${y}).`);
+        }
+    }
+
+    private collectPotion(player: Phaser.GameObjects.GameObject, potion: Phaser.GameObjects.GameObject) {
+        potion.destroy(); // Remove the potion
+        this.potion = undefined;
+
+        // Heal the player
+        this.playerHPInstance = Math.min(this.playerHPInstance + 20, 100); // Max HP is 100
+        Game.playerHP = this.playerHPInstance;
+
+        console.log(`Potion collected! Player healed to ${this.playerHPInstance} HP.`);
     }
 
     /**
