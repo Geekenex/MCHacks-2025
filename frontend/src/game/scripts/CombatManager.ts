@@ -7,6 +7,10 @@ interface NPCData {
   healthBar?: Phaser.GameObjects.Graphics;
 }
 
+const DAMAGE_TAKEN = 10;
+const DAMAGE_DEALT = 100;
+
+const COMBAT_TEXT_DELAY = 1600;
 export class CombatManager {
   private scene: Phaser.Scene;
   private npc: NPCData;
@@ -16,7 +20,7 @@ export class CombatManager {
   private menuTexts: Phaser.GameObjects.Text[] = [];
   private infoText: Phaser.GameObjects.Text;
   private inActionText: boolean = false;
-  private onCombatEnd: () => void;
+  private onCombatEnd: (result: { playerHP: number; npcWasKilled: boolean }) => void;
 
   private keys: {
     up: Phaser.Input.Keyboard.Key;
@@ -24,7 +28,12 @@ export class CombatManager {
     enter: Phaser.Input.Keyboard.Key;
   };
 
-  constructor(scene: Phaser.Scene, npc: NPCData, playerHP: number, onCombatEnd: () => void) {
+  constructor(
+    scene: Phaser.Scene,
+    npc: NPCData,
+    playerHP: number,
+    onCombatEnd: (result: { playerHP: number; npcWasKilled: boolean }) => void
+  ) {
     this.scene = scene;
     this.npc = npc;
     this.playerHP = playerHP;
@@ -56,11 +65,9 @@ export class CombatManager {
     if (!this.npc.healthBar) return;
     this.npc.healthBar.clear();
 
-    // Draw background
     this.npc.healthBar.fillStyle(0x000000, 1);
     this.npc.healthBar.fillRect(this.npc.sprite.x - 30, this.npc.sprite.y - 60, 60, 8);
 
-    // Fill based on current NPC health
     this.npc.healthBar.fillStyle(0xff0000, 1);
     let width = (this.npc.health / 100) * 60;
     if (width < 0) width = 0;
@@ -68,7 +75,6 @@ export class CombatManager {
   }
 
   private createMenu() {
-    // You can adjust these positions as desired
     const startX = 100;
     const startY = 400;
 
@@ -88,10 +94,8 @@ export class CombatManager {
   }
 
   private handleInput() {
-    // If we're currently showing action text, don't allow selecting
     if (this.inActionText) return;
 
-    // Move selection up/down
     if (Phaser.Input.Keyboard.JustDown(this.keys.up)) {
       this.currentSelection =
         (this.currentSelection - 1 + this.menuOptions.length) % this.menuOptions.length;
@@ -120,20 +124,20 @@ export class CombatManager {
       // NPC picks randomly
       const npcChoice = this.getRandomChoice();
       this.showActionText(`NPC chose ${npcChoice}!`, () => {
-        // Resolve RPS
+
         const winner = this.determineWinner(playerChoice, npcChoice);
         if (winner === 'player') {
-          this.npc.health -= 20;
+          this.npc.health -= DAMAGE_DEALT;
           this.updateHealthBar();
           this.showActionText(`You won this round!`, () => {
             if (this.npc.health <= 0) {
               this.endCombat(`NPC fainted!`);
               return;
             }
-            this.inActionText = false; // ready for next selection
+            this.inActionText = false; //ready for next selection
           });
         } else if (winner === 'npc') {
-          this.playerHP -= 10;
+          this.playerHP -= DAMAGE_TAKEN;
           this.showActionText(`NPC won this round! Your HP: ${this.playerHP}`, () => {
             if (this.playerHP <= 0) {
               this.endCombat(`You fainted!`);
@@ -156,8 +160,7 @@ export class CombatManager {
     this.infoText.setText(message);
     this.infoText.setVisible(true);
 
-    // Show message for 1.5s then callback
-    this.scene.time.delayedCall(1500, () => {
+    this.scene.time.delayedCall(COMBAT_TEXT_DELAY, () => {
       this.infoText.setVisible(false);
       onComplete();
     });
@@ -165,13 +168,22 @@ export class CombatManager {
 
   private endCombat(message: string) {
     this.showActionText(message, () => {
-      // Cleanup
+
+      const npcWasKilled = this.npc.health <= 0;
+
       this.npc.sprite.destroy();
       this.npc.healthBar?.destroy();
       this.menuTexts.forEach(t => t.destroy());
       this.scene.events.off('update', this.handleInput, this);
       this.infoText.destroy();
-      this.onCombatEnd();
+
+      console.log(`Combat End: NPC Was Killed = ${npcWasKilled}, Player HP = ${this.playerHP}`);
+
+      // Pass back the updated playerHP and whether NPC was killed
+      this.onCombatEnd({
+        playerHP: this.playerHP,
+        npcWasKilled: npcWasKilled,
+      });
     });
   }
 

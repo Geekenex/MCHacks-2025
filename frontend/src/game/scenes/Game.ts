@@ -1,17 +1,24 @@
 import { EventBus } from '../EventBus';
-import { Scene } from 'phaser';
+import Phaser from 'phaser';
 import { DialogueManager, DialogueLine } from '../scripts/DialogueManager';
-import { CombatManager } from '../scripts/CombatManager';
 
 interface NPCData {
-    sprite: Phaser.Physics.Arcade.Sprite;
-    interacted: boolean;
-    health: number;
-    healthBar?: Phaser.GameObjects.Graphics;
-  
+  id: number;
+  sprite: Phaser.Physics.Arcade.Sprite;
+  interacted: boolean;
+  health: number;
+  healthBar?: Phaser.GameObjects.Graphics;
+  defeated: boolean;
 }
 
-export class Game extends Scene {
+
+interface GameInitData {
+  playerHP?: number;
+  npcIndexToRemove?: number;
+  npcWasKilled?: boolean;
+}
+
+export class Game extends Phaser.Scene {
   camera: Phaser.Cameras.Scene2D.Camera;
   background: Phaser.GameObjects.Image;
   player: Phaser.Physics.Arcade.Sprite;
@@ -28,6 +35,29 @@ export class Game extends Scene {
   constructor() {
     super('Game');
   }
+  
+
+  init(data: GameInitData) {
+    console.log(`Game scene init with data:`, data);
+    if (data.playerHP !== undefined) {
+      this.playerHP = data.playerHP;
+      console.log(`Player HP updated to: ${this.playerHP}`);
+    }
+
+    this.isInCombat = false;
+
+    if (data.npcWasKilled && data.npcIndexToRemove !== undefined) {
+      const npcToRemove = this.npcs[data.npcIndexToRemove];
+      if (npcToRemove) {
+          npcToRemove.sprite.destroy();
+          npcToRemove.defeated = true;
+          console.log(`NPC at index ${data.npcIndexToRemove} marked as defeated.`);
+      } else {
+          console.warn(`No NPC found at index ${data.npcIndexToRemove}`);
+      }
+  }
+  
+  }
 
   preload() {
     this.load.spritesheet('player', 'assets/player.png', {
@@ -40,12 +70,13 @@ export class Game extends Scene {
     });
     this.load.image('background1', 'assets/background1.png');
   }
-
+  
   create() {
     this.camera = this.cameras.main;
     this.camera.setBackgroundColor(0);
     this.background = this.add.image(512, 384, 'background1').setAlpha(0.5);
 
+    // Animation setup
     this.anims.create({
       key: 'down',
       frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
@@ -95,37 +126,51 @@ export class Game extends Scene {
       repeat: -1,
     });
 
+    // Player setup
     this.player = this.physics.add.sprite(256, 256, 'player');
     this.player.setCollideWorldBounds(true);
     this.player.play('idle-down');
 
+    //if (this.npcs.length === 0) {
+    // NPC setup
     const npcPositions = [
       { x: 400, y: 256 },
       { x: 500, y: 300 },
       { x: 600, y: 256 },
     ];
 
-    npcPositions.forEach(pos => {
+    let nextNpcId = 0;
+
+    npcPositions.forEach((pos, index) => {
+      if (this.npcs[index]?.defeated) {
+          console.log(`Skipping NPC ${index} (already defeated).`);
+          return; // Skip NPC creation
+      }
+  
       const sprite = this.physics.add.sprite(pos.x, pos.y, 'npc');
       sprite.setOrigin(0.5, 0.5);
       sprite.setImmovable(true);
       sprite.setScale(0.2);
       if (sprite.body) {
-        sprite.body.setSize(32, 32);
+          sprite.body.setSize(32, 32);
       }
+  
       const npcData: NPCData = {
-        sprite,
-        interacted: false,
-        health: 100,
+          id: nextNpcId++, // Assign unique ID
+          sprite,
+          interacted: false,
+          health: 100,
+          defeated: false,
       };
-
-      // Overlap handler for a specific NPC
+  
       this.physics.add.overlap(this.player, sprite, () => {
-        this.handleNpcOverlap(npcData);
+          this.handleNpcOverlap(npcData);
       });
-
+  
       this.npcs.push(npcData);
-    });
+  });
+//}
+  
 
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
@@ -138,23 +183,25 @@ export class Game extends Scene {
     }
 
     const lines: DialogueLine[] = [
-        { speaker: 'Player', text: 'Hello, NPC!' },
-        { speaker: 'NPC', text: 'Hello, Player!' },
-        { speaker: 'Player', text: 'How are you today?' },
-        { speaker: 'NPC', text: 'Doing well, thanks!' },
-      ];
+      { speaker: 'Player', text: 'Hello, NPC!' },
+      { speaker: 'NPC', text: 'Hello, Player!' },
+      { speaker: 'Player', text: 'Shall we battle?' },
+      { speaker: 'NPC', text: 'Yes, let\'s do it!' },
+    ];
 
     this.dialogueManager = new DialogueManager(this, lines, () => {
       if (this.currentNpc) {
         this.isInCombat = true;
-        const combatManager = new CombatManager(this, this.currentNpc, this.playerHP, () => {
-          this.isInCombat = false;
+
+        const npcIndex = this.npcs.indexOf(this.currentNpc);
+        console.log(`Starting CombatScene with NPC Index: ${npcIndex}`);
+        this.scene.start('CombatScene', {
+          playerHP: this.playerHP,        // pass current player HP
+          npcIndex: npcIndex,
+          npcData: { health: this.currentNpc.health }, // pass NPC data
         });
-        combatManager.startCombat();
       }
     });
-
-
 
     EventBus.emit('current-scene-ready', this);
   }
@@ -197,13 +244,13 @@ export class Game extends Scene {
     }
   }
 
-
   private handleNpcOverlap(npc: NPCData) {
     if (npc.interacted || this.dialogueManager.isDialogueActive()) return;
 
     npc.interacted = true;
     this.currentNpc = npc;
 
+    console.log(`Player interacted with NPC. Starting dialogue.`);
     this.dialogueManager.startDialogue();
   }
 }
