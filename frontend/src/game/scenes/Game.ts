@@ -217,6 +217,7 @@ export class Game extends Scene {
     create(): void {
         this.handleAnimations();
 
+
         if (this.textures.exists('playerTexture')) {
             this.initializePlayerWithBase64Texture();
         } else {
@@ -224,6 +225,21 @@ export class Game extends Scene {
                 console.error("Failed to load player sprite:", error);
                 this.initializePlayerWithFallback();
             });
+        }
+
+        // Clear existing NPCs before creating new ones
+        this.clearAllNPCs();
+
+        // Initialize NPCs based on current state
+        if (Game.npcsState.length === 0) {
+            // If no NPCs in state, spawn initial NPCs
+            const initialNumberOfNPCs = Phaser.Math.Between(1, 5);
+            console.log(`Spawning initial ${initialNumberOfNPCs} NPC(s).`);
+            this.spawnInitialNPCs(initialNumberOfNPCs);
+        } else {
+            // Create NPCs from existing state
+            console.log(`Creating NPCs from saved state.`);
+            this.createNPCsFromState();
         }
 
         this.updateDialogue();
@@ -239,6 +255,7 @@ export class Game extends Scene {
         this.dialogueText.setVisible(false);
 
         EventBus.emit('current-scene-ready', this);
+
     }
 
     update(): void {
@@ -282,7 +299,306 @@ export class Game extends Scene {
         }
     }
 
-    private handleAnimations(): void {
+    /**
+     * Generates a random position within the game bounds, ensuring it's outside the buffer zone around the player.
+     */
+    private getRandomPosition(buffer: number = this.npcSpawnBuffer): { x: number, y: number } {
+        const maxAttempts = 100;
+        let attempts = 0;
+        let position: { x: number, y: number };
+
+        do {
+            const x = Phaser.Math.Between(50, this.scale.width - 50);
+            const y = Phaser.Math.Between(50, this.scale.height - 50);
+            const distance = Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y);
+
+            if (distance >= buffer) {
+                position = { x, y };
+                // Optionally, check for overlap with other NPCs
+                const overlapping = this.npcs.some(npc => {
+                    return Phaser.Math.Distance.Between(x, y, npc.x, npc.y) < 50;
+                });
+                if (!overlapping) {
+                    return position;
+                }
+            }
+
+            attempts++;
+            if (attempts > maxAttempts) {
+                console.warn("Max attempts reached while generating NPC position.");
+                break;
+            }
+        } while (true);
+
+        return { x: this.player.x + buffer + 10, y: this.player.y + buffer + 10 };
+    }
+
+    /**
+     * Spawns initial NPCs and updates the static npcsState.
+     * @param numberOfNPCs - The number of NPCs to spawn initially.
+     */
+    private spawnInitialNPCs(numberOfNPCs: number) {
+        for (let i = 0; i < numberOfNPCs; i++) {
+            const npcId = Game.nextNpcId++;
+            const newPos = this.getRandomPosition();
+            const sprite = this.physics.add.sprite(newPos.x, newPos.y, 'npc');
+            sprite.setOrigin(0.5, 0.5);
+            sprite.setImmovable(true);
+            sprite.setScale(0.2);
+            if (sprite.body) {
+                sprite.body.setSize(32, 32);
+            }
+
+            const npcData: NPCData = {
+                id: npcId,
+                x: newPos.x,
+                y: newPos.y,
+                sprite,
+                interacted: false,
+                health: 100,
+                defeated: false,
+            };
+
+            this.physics.add.overlap(this.player, sprite, () => {
+                this.handleNpcOverlap(npcData);
+            });
+
+            this.npcs.push(npcData);
+            Game.npcsState.push(npcData);
+        }
+
+        console.log(`Spawned ${this.npcs.length} initial NPC(s).`);
+    }
+
+    /**
+     * Creates NPC sprites based on the static npcsState.
+     */
+    private createNPCsFromState() {
+        Game.npcsState.forEach(npcData => {
+            console.log(npcData);
+            if (npcData.defeated) return; // Skip defeated NPCs
+
+            const sprite = this.physics.add.sprite(npcData.x, npcData.y, 'npc');
+            sprite.setOrigin(0.5, 0.5);
+            sprite.setImmovable(true);
+            sprite.setScale(0.2);
+            if (sprite.body) {
+                sprite.body.setSize(32, 32);
+            }
+
+            this.physics.add.overlap(this.player, sprite, () => {
+                this.handleNpcOverlap(npcData);
+            });
+
+            npcData.sprite = sprite;
+            this.npcs.push(npcData);
+        });
+
+        console.log(`Created ${this.npcs.length} NPC(s) from state.`);
+    }
+    /**
+     * Spawns a specified number of NPCs with random positions, avoiding the player's starting area.
+     * @param numberOfNPCs - The number of NPCs to spawn.
+     */
+    private spawnNPCs(numberOfNPCs: number): void {
+        for (let i = 0; i < numberOfNPCs; i++) {
+            // Assign unique IDs using the static counter
+            const npcId = Game.nextNpcId++;
+
+            // Skip spawning if the NPC ID is in the defeated list
+            if (Game.defeatedNpcIds.includes(npcId)) {
+                console.log(`NPC ID ${npcId} is defeated. Skipping spawn.`);
+                continue;
+            }
+
+            const newPos = this.getRandomPosition();
+            const sprite = this.physics.add.sprite(newPos.x, newPos.y, 'npc');
+            sprite.setOrigin(0.5, 0.5);
+            sprite.setImmovable(true);
+            sprite.setScale(0.2);
+            if (sprite.body) {
+                sprite.body.setSize(32, 32);
+            }
+
+            const npcData: NPCData = {
+                id: npcId,
+                x: newPos.x,
+                y: newPos.y,
+                sprite,
+                interacted: false,
+                health: 100,
+                defeated: false,
+            };
+
+            this.physics.add.overlap(this.player, sprite, () => {
+                this.handleNpcOverlap(npcData);
+            });
+
+            this.npcs.push(npcData);
+            Game.npcsState.push(npcData);
+        }
+
+        console.log(`Spawned ${this.npcs.length} NPC(s) on the screen.`);
+        this.spawnPotion();
+    }
+
+    /**
+     * Handles the overlap between the player and an NPC.
+     * Initiates dialogue and combat if conditions are met.
+     * @param npc - The NPC data object.
+     */
+    private handleNpcOverlap(npc: NPCData) {
+        if (npc.interacted || this.dialogueManager.isDialogueActive()) return;
+
+        if (!this.dialogueLines || this.dialogueLines.length === 0) {
+            console.warn("No dialogue lines available for this NPC.");
+            return;
+        }
+
+        npc.interacted = true;
+        this.currentNpc = npc;
+
+        console.log(`Player interacted with NPC. Starting dialogue.`);
+        this.updateDialogue();
+        this.dialogueManager.startDialogue();
+    }
+
+    /**
+     * Handles transitioning to a new stage/map when the player moves out of bounds.
+     * @param up - Boolean indicating if the player moved up.
+     * @param down - Boolean indicating if the player moved down.
+     * @param left - Boolean indicating if the player moved left.
+     * @param right - Boolean indicating if the player moved right.
+     */
+    private handleTransition(up: boolean, down: boolean, left: boolean, right: boolean) {
+        if (this.isTransitioning) return;
+        this.isTransitioning = true;
+
+        const gameWidth = this.scale.width;
+        const gameHeight = this.scale.height;
+
+        const bufferX = 64 + 10;
+        const bufferY = 64 + 10;
+
+        let direction: keyof typeof WorldManager.maps | null = null;
+
+        if (left) direction = 'leftMap';
+        else if (right) direction = 'rightMap';
+        else if (up) direction = 'upMap';
+        else if (down) direction = 'downMap';
+
+        if (!direction) {
+            this.isTransitioning = false;
+            return;
+        }
+
+        this.clearAllNPCs();
+
+        if (this.potion) {
+            this.potion.destroy();
+            this.potion = undefined;
+        }
+
+
+        Game.npcsState = [];
+        console.log(`Game state cleared for the new area.`);
+
+
+        WorldManager.generateMaps(direction);
+
+        this.cameras.main.fadeOut(500, 0, 0, 0);
+
+        if (this.player.body) this.player.body.checkCollision.none = true;
+
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.background.setTexture(WorldManager.maps.currentMap);
+
+            if (direction === 'leftMap') {
+                this.player.x = gameWidth - bufferX;
+                this.player.y = Phaser.Math.Clamp(this.player.y, bufferY, gameHeight - bufferY);
+            } else if (direction === 'rightMap') {
+                this.player.x = bufferX;
+                this.player.y = Phaser.Math.Clamp(this.player.y, bufferY, gameHeight - bufferY);
+            } else if (direction === 'upMap') {
+                this.player.y = gameHeight - bufferY;
+                this.player.x = Phaser.Math.Clamp(this.player.x, bufferX, gameWidth - bufferX);
+            } else if (direction === 'downMap') {
+                this.player.y = bufferY;
+                this.player.x = Phaser.Math.Clamp(this.player.x, bufferX, gameWidth - bufferX);
+            }
+
+            this.player.setVelocity(0, 0);
+
+            if (this.player.body) this.player.body.checkCollision.none = false;
+
+            // Spawn new NPCs for the new area
+            const numberOfNPCs = Phaser.Math.Between(1, 5);
+            console.log(`Spawning ${numberOfNPCs} NPC(s) for the new area.`);
+            this.spawnNPCs(numberOfNPCs);
+
+            this.cameras.main.fadeIn(500, 0, 0, 0);
+            this.isTransitioning = false;
+        });
+    }
+
+    /**
+     * Destroys all existing NPC sprites and clears the NPCs array.
+     */
+    private clearAllNPCs() {
+        this.npcs.forEach(npc => {
+            if (npc.sprite) {
+                npc.sprite.destroy();
+                console.log(`Destroyed NPC sprite with ID: ${npc.id}`);
+            }
+        });
+        this.npcs = [];
+        console.log(`All NPCs have been cleared from the game world.`);
+    }
+
+
+
+    private potion?: Phaser.Physics.Arcade.Sprite;
+
+    private spawnPotion() {
+        // Clear any existing potion before spawning a new one
+        if (this.potion) {
+            this.potion.destroy();
+            this.potion = undefined;
+        }
+
+        const chance = Phaser.Math.Between(1, 100);
+        if (chance <= 30) { // 30% chance to spawn a potion
+            const x = Phaser.Math.Between(50, this.scale.width - 50);
+            const y = Phaser.Math.Between(50, this.scale.height - 50);
+
+            // Create a new potion sprite
+            this.potion = this.physics.add.sprite(x, y, 'potion');
+            this.potion.setOrigin(0.5, 0.5).setScale(0.07).setImmovable(true);
+
+            // Enable player overlap with the potion
+            this.physics.add.overlap(this.player, this.potion, this.collectPotion as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback, undefined, this);
+
+            console.log(`Potion spawned at (${x}, ${y}).`);
+        } else {
+            console.log("No potion spawned this time.");
+        }
+    }
+
+    private collectPotion(player: Phaser.Physics.Arcade.Sprite, potion: Phaser.Physics.Arcade.Sprite) {
+        potion.destroy(); // Remove the potion
+        this.potion = undefined;
+
+        // Heal the player
+        this.playerHPInstance = Math.min(this.playerHPInstance + 20, 100); // Max HP is 100
+        Game.playerHP = this.playerHPInstance;
+
+        console.log(`Potion collected! Player healed to ${this.playerHPInstance} HP.`);
+    }
+
+    /** Phaser.Types.Physics.Arcade.ArcadePhysicsCallback
+     * Sets up player animations.
+     */
+    private handleAnimations() {
         this.camera = this.cameras.main;
         this.camera.setBackgroundColor(0);
         this.background = this.add.image(this.scale.width / 2, this.scale.height / 2, 'background1').setAlpha(1);
