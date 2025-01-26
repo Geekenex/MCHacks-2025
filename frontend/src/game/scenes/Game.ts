@@ -144,7 +144,7 @@ export class Game extends Scene {
                 this.time.delayedCall(3000, () => {
                     this.scene.start('CombatScene', {
                         playerHP: this.playerHPInstance,
-                        npcIndexToRemove: this.currentNpc!.id, 
+                        npcIndex: this.currentNpc!.id, // Pass NPC ID
                         npcWasKilled: true,
                         npcData: { health: this.currentNpc!.health },
                         prompt: this.inputPrompt,
@@ -339,6 +339,7 @@ export class Game extends Scene {
      */
     private createNPCsFromState() {
         Game.npcsState.forEach(npcData => {
+          console.log(npcData);
             if (npcData.defeated) return; // Skip defeated NPCs
 
             const sprite = this.physics.add.sprite(npcData.x, npcData.y, 'npc');

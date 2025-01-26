@@ -28,6 +28,8 @@ export class CombatScene extends Phaser.Scene {
   private turnInProgress: boolean = false;
   private combatEnded: boolean = false;
 
+  private npcWasKilled: boolean = false;
+
   constructor() {
     super('CombatScene');
   }
@@ -231,14 +233,17 @@ export class CombatScene extends Phaser.Scene {
 
     if (result.npcWasKilled) {
       this.addCombatLog('Player won the battle!');
+      this.npcWasKilled = true;
+
     } else {
       this.addCombatLog('Player lost the battle...');
+      this.npcWasKilled = false;
     }
 
     this.time.delayedCall(2000, () => {
       this.cameras.main.fadeOut(1000, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('Game', { playerPosition: this.playerPosition });
+        this.scene.start('Game', { playerPosition: this.playerPosition, npcWasKilled: this.npcWasKilled, npcIndexToRemove: this.npcIndex });
       });
     });
   }
