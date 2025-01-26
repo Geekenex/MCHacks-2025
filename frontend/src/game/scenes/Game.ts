@@ -1,10 +1,21 @@
 import { EventBus } from '../EventBus';
 import { Scene } from 'phaser';
 import { WorldManager } from '../scripts/WorldManager';
+import { DialogueManager, DialogueLine } from '../scripts/DialogueManager';
 
 interface NPCData {
+    id: number;
     sprite: Phaser.Physics.Arcade.Sprite;
     interacted: boolean;
+    health: number;
+    healthBar?: Phaser.GameObjects.Graphics;
+    defeated: boolean;
+}
+
+interface GameInitData {
+    playerHP?: number;
+    npcIndexToRemove?: number;
+    npcWasKilled?: boolean;
 }
 
 export class Game extends Scene {
@@ -14,7 +25,11 @@ export class Game extends Scene {
     cursors: Phaser.Types.Input.Keyboard.CursorKeys;
     wasd: { up: Phaser.Input.Keyboard.Key; down: Phaser.Input.Keyboard.Key; left: Phaser.Input.Keyboard.Key; right: Phaser.Input.Keyboard.Key };
     npcs: NPCData[] = [];
-    dialogue: { speaker: string; text: string }[];
+    dialogueManager: DialogueManager;
+    currentNpc: NPCData | null = null;
+    playerHP: number = 100;
+    isInCombat: boolean = false;
+    dialogue: { speaker: string; text: string }[] = [];
     currentLineIndex: number;
     dialogueActive: boolean;
     dialogueBox: Phaser.GameObjects.Rectangle;
@@ -25,6 +40,27 @@ export class Game extends Scene {
         super('Game');
     }
 
+    init(data: GameInitData) {
+        console.log(`Game scene init with data:`, data);
+        if (data.playerHP !== undefined) {
+            this.playerHP = data.playerHP;
+            console.log(`Player HP updated to: ${this.playerHP}`);
+        }
+
+        this.isInCombat = false;
+
+        if (data.npcWasKilled && data.npcIndexToRemove !== undefined) {
+            const npcToRemove = this.npcs[data.npcIndexToRemove];
+            if (npcToRemove) {
+                npcToRemove.sprite.destroy();
+                npcToRemove.defeated = true;
+                console.log(`NPC at index ${data.npcIndexToRemove} marked as defeated.`);
+            } else {
+                console.warn(`No NPC found at index ${data.npcIndexToRemove}`);
+            }
+        }
+    }
+
     preload() {
         this.load.spritesheet('player', 'assets/player.png', { frameWidth: 256, frameHeight: 256 });
         this.load.spritesheet('npc', 'assets/npc.png', { frameWidth: 512, frameHeight: 512 });
@@ -32,7 +68,7 @@ export class Game extends Scene {
     }
 
     create() {
-        this.handleAnimations()
+        this.handleAnimations();
 
         this.player = this.physics.add.sprite(256, 256, 'player');
         this.player.setScale(0.5); // Scale down to 128x128
@@ -59,7 +95,14 @@ export class Game extends Scene {
             { x: 600, y: 256 },
         ];
 
-        npcPositions.forEach(pos => {
+        let nextNpcId = 0;
+
+        npcPositions.forEach((pos, index) => {
+            if (this.npcs[index]?.defeated) {
+                console.log(`Skipping NPC ${index} (already defeated).`);
+                return; // Skip NPC creation
+            }
+
             const sprite = this.physics.add.sprite(pos.x, pos.y, 'npc');
             sprite.setOrigin(0.5, 0.5);
             sprite.setImmovable(true);
@@ -67,10 +110,19 @@ export class Game extends Scene {
             if (sprite.body) {
                 sprite.body.setSize(32, 32);
             }
-            const npcData: NPCData = { sprite, interacted: false };
+
+            const npcData: NPCData = {
+                id: nextNpcId++, // Assign unique ID
+                sprite,
+                interacted: false,
+                health: 100,
+                defeated: false,
+            };
+
             this.physics.add.overlap(this.player, sprite, () => {
                 this.handleNpcOverlap(npcData);
             });
+
             this.npcs.push(npcData);
         });
 
@@ -84,15 +136,26 @@ export class Game extends Scene {
             };
         }
 
-        this.dialogue = [
+        const lines: DialogueLine[] = [
             { speaker: 'Player', text: 'Hello, NPC!' },
             { speaker: 'NPC', text: 'Hello, Player!' },
-            { speaker: 'Player', text: 'How are you today?' },
-            { speaker: 'NPC', text: 'Doing well, thanks!' },
+            { speaker: 'Player', text: 'Shall we battle?' },
+            { speaker: 'NPC', text: 'Yes, let\'s do it!' },
         ];
 
-        this.currentLineIndex = 0;
-        this.dialogueActive = false;
+        this.dialogueManager = new DialogueManager(this, lines, () => {
+            if (this.currentNpc) {
+                this.isInCombat = true;
+
+                const npcIndex = this.npcs.indexOf(this.currentNpc);
+                console.log(`Starting CombatScene with NPC Index: ${npcIndex}`);
+                this.scene.start('CombatScene', {
+                    playerHP: this.playerHP, // pass current player HP
+                    npcIndex: npcIndex,
+                    npcData: { health: this.currentNpc.health }, // pass NPC data
+                });
+            }
+        });
 
         this.dialogueBox = this.add.rectangle(0, this.scale.height - 80, this.scale.width, 80, 0x000000, 1).setOrigin(0, 0);
         this.dialogueBox.setVisible(false);
@@ -104,31 +167,19 @@ export class Game extends Scene {
         });
         this.dialogueText.setVisible(false);
 
-        this.input.on('pointerdown', () => {
-            if (!this.dialogueActive) return;
-            this.currentLineIndex++;
-            if (this.currentLineIndex >= this.dialogue.length) {
-                this.dialogueActive = false;
-                this.dialogueBox.setVisible(false);
-                this.dialogueText.setVisible(false);
-            } else {
-                this.dialogueText.setText(this.dialogue[this.currentLineIndex].text);
-            }
-        });
-
         EventBus.emit('current-scene-ready', this);
     }
 
     update() {
-        if (this.dialogueActive) {
+        if (this.dialogueManager.isDialogueActive() || this.isInCombat) {
             this.player.setVelocity(0, 0);
             return;
         }
 
-        const movingLeft = this.cursors.left?.isDown || this.wasd.left.isDown;
-        const movingRight = this.cursors.right?.isDown || this.wasd.right.isDown;
-        const movingUp = this.cursors.up?.isDown || this.wasd.up.isDown;
-        const movingDown = this.cursors.down?.isDown || this.wasd.down.isDown;
+        const movingLeft = this.wasd.left.isDown;
+        const movingRight = this.wasd.right.isDown;
+        const movingUp = this.wasd.up.isDown;
+        const movingDown = this.wasd.down.isDown;
 
         if (movingLeft && !movingRight && !movingUp && !movingDown) {
             this.player.setVelocity(-200, 0);
@@ -158,15 +209,13 @@ export class Game extends Scene {
     }
 
     private handleNpcOverlap(npc: NPCData) {
-        if (npc.interacted || this.dialogueActive) return;
-
-        this.dialogueActive = true;
-        this.currentLineIndex = 0;
-        this.dialogueBox.setVisible(true);
-        this.dialogueText.setText(this.dialogue[this.currentLineIndex].text);
-        this.dialogueText.setVisible(true);
+        if (npc.interacted || this.dialogueManager.isDialogueActive()) return;
 
         npc.interacted = true;
+        this.currentNpc = npc;
+
+        console.log(`Player interacted with NPC. Starting dialogue.`);
+        this.dialogueManager.startDialogue();
     }
 
     private handleTransition(up: boolean, down: boolean, left: boolean, right: boolean) {
@@ -228,57 +277,57 @@ export class Game extends Scene {
     }
 
     private handleAnimations() {
-      this.camera = this.cameras.main;
-      this.camera.setBackgroundColor(0);
-      this.background = this.add.image(1024-64, 768-192, 'background1').setAlpha(1);
+        this.camera = this.cameras.main;
+        this.camera.setBackgroundColor(0);
+        this.background = this.add.image(1024-64, 768-192, 'background1').setAlpha(1);
 
-      this.anims.create({
-          key: 'down',
-          frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
-          frameRate: 10,
-          repeat: -1,
-      });
-      this.anims.create({
-          key: 'left',
-          frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
-          frameRate: 10,
-          repeat: -1,
-      });
-      this.anims.create({
-          key: 'right',
-          frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
-          frameRate: 10,
-          repeat: -1,
-      });
-      this.anims.create({
-          key: 'up',
-          frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
-          frameRate: 10,
-          repeat: -1,
-      });
-      this.anims.create({
-          key: 'idle-down',
-          frames: [{ key: 'player', frame: 1 }],
-          frameRate: 1,
-          repeat: -1,
-      });
-      this.anims.create({
-          key: 'idle-left',
-          frames: [{ key: 'player', frame: 5 }],
-          frameRate: 1,
-          repeat: -1,
-      });
-      this.anims.create({
-          key: 'idle-right',
-          frames: [{ key: 'player', frame: 9 }],
-          frameRate: 1,
-          repeat: -1,
-      });
-      this.anims.create({
-          key: 'idle-up',
-          frames: [{ key: 'player', frame: 13 }],
-          frameRate: 1,
-          repeat: -1,
-      });
+        this.anims.create({
+            key: 'down',
+            frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
+            frameRate: 10,
+            repeat: -1,
+        });
+        this.anims.create({
+            key: 'left',
+            frames: this.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
+            frameRate: 10,
+            repeat: -1,
+        });
+        this.anims.create({
+            key: 'right',
+            frames: this.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
+            frameRate: 10,
+            repeat: -1,
+        });
+        this.anims.create({
+            key: 'up',
+            frames: this.anims.generateFrameNumbers('player', { start: 12, end: 15 }),
+            frameRate: 10,
+            repeat: -1,
+        });
+        this.anims.create({
+            key: 'idle-down',
+            frames: [{ key: 'player', frame: 1 }],
+            frameRate: 1,
+            repeat: -1,
+        });
+        this.anims.create({
+            key: 'idle-left',
+            frames: [{ key: 'player', frame: 5 }],
+            frameRate: 1,
+            repeat: -1,
+        });
+        this.anims.create({
+            key: 'idle-right',
+            frames: [{ key: 'player', frame: 9 }],
+            frameRate: 1,
+            repeat: -1,
+        });
+        this.anims.create({
+            key: 'idle-up',
+            frames: [{ key: 'player', frame: 13 }],
+            frameRate: 1,
+            repeat: -1,
+        });
     }
 }
