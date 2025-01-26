@@ -49,6 +49,8 @@ export class Game extends Scene {
     private isTransitioning: boolean = false;
     inputPrompt: String;
     backgroundMusic: Phaser.Sound.BaseSound;
+    playerHealthBar: Phaser.GameObjects.Graphics;
+    private healthText: Phaser.GameObjects.Text | null = null;
 
     // Buffer distance to avoid spawning NPCs too close to the player
     private npcSpawnBuffer: number = 150;
@@ -174,6 +176,9 @@ export class Game extends Scene {
         const startX = Game.playerPosition.x;
         const startY = Game.playerPosition.y;
 
+        this.createPlayerHealthBar();
+        this.updatePlayerHealthBar();
+
         this.player = this.physics.add.sprite(startX, startY, 'player');
         this.player.setScale(0.5);
         this.player.setCollideWorldBounds(true);
@@ -272,6 +277,32 @@ export class Game extends Scene {
                 this.player.play('idle-down');
             }
         }
+    }
+
+    private createPlayerHealthBar() {
+        this.playerHealthBar = this.add.graphics();
+        this.updatePlayerHealthBar();
+    }
+    
+    private updatePlayerHealthBar() {
+        if (!this.playerHealthBar) return;
+    
+        this.playerHealthBar.clear();
+        this.playerHealthBar.fillStyle(0x000000, 1);
+        this.playerHealthBar.fillRect(20, 20, 200, 16); // Health bar background
+    
+        const width = Math.max((Game.playerHP / 100) * 200, 0);
+        this.playerHealthBar.fillStyle(0x00ff00, 1);
+        this.playerHealthBar.fillRect(20, 20, width, 16); // Health bar foreground
+    
+        if (this.healthText) {
+            this.healthText.destroy(); // Destroy the previous health text
+        }
+
+        this.healthText = this.add.text(230, 16, `HP: ${Game.playerHP}/100`, {
+            fontSize: '14px',
+            color: '#ffffff',
+        }).setDepth(1);
     }
 
     /**
@@ -565,11 +596,12 @@ private spawnNPCs(numberOfNPCs: number): void {
         this.potion = undefined;
     
         // Heal the player
-        this.playerHPInstance = Math.min(this.playerHPInstance + 20, 100); // Max HP is 100
+        this.playerHPInstance = Math.min(Game.playerHP + 20, 100); // Max HP is 100
         Game.playerHP = this.playerHPInstance;
-    
+        
         this.sound.add('heal').play();
         console.log(`Potion collected! Player healed to ${this.playerHPInstance} HP.`);
+        this.updatePlayerHealthBar();
     }
 
     /** Phaser.Types.Physics.Arcade.ArcadePhysicsCallback

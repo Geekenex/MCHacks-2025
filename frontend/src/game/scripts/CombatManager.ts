@@ -84,7 +84,7 @@ export class CombatManager {
     }
   }
 
-  public playerAction(actionName: string) {
+  public playerAction(actionName: string, sound: Phaser.Sound.NoAudioSoundManager | Phaser.Sound.HTML5AudioSoundManager | Phaser.Sound.WebAudioSoundManager) {
     if (!this.isPlayerTurn || this.combatEnded) return;
 
     const action = this.menuOptions.find((opt) => opt.name === actionName);
@@ -98,10 +98,12 @@ export class CombatManager {
     switch (action.type) {
       case 'offense':
         this.npc.health -= 15;
+        sound.play('attack');
         actionLog = `Player used ${actionName} and dealt 15 damage to the enemy!`;
         break;
       case 'defense':
         this.playerHP += 10;
+        sound.play('combat_heal');
         actionLog = `Player used ${actionName} and healed 10 HP!`;
         break;
       case 'wacky':
@@ -113,6 +115,7 @@ export class CombatManager {
         } else {
 
           this.npc.health -= 25;
+          sound.play('special_attack');
           actionLog = `Player used ${actionName} and dealt 25 damage to the enemy!`;
           break;
         }

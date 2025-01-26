@@ -210,7 +210,7 @@ export class CombatScene extends Phaser.Scene {
     if (this.turnInProgress || this.combatEnded) return;
     this.turnInProgress = true;
 
-    this.combatManager.playerAction(option);
+    this.combatManager.playerAction(option, this.sound);
 
     this.updatePlayerHealthBar();
 
@@ -236,6 +236,8 @@ export class CombatScene extends Phaser.Scene {
     if (this.combatEnded) return; // Prevent duplicate endings
     this.combatEnded = true;
 
+    this.playerHP = result.playerHP;
+
     this.sound.add('enemy_death').play();
     if (result.npcWasKilled) {
       this.addCombatLog('Player won the battle!');
@@ -246,14 +248,28 @@ export class CombatScene extends Phaser.Scene {
       this.npcWasKilled = false;
     }
 
+    if(result.npcWasKilled) {
+
     this.time.delayedCall(2000, () => {
       this.cameras.main.fadeOut(1000, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('Game', { playerPosition: this.playerPosition, npcWasKilled: this.npcWasKilled, npcIndexToRemove: this.npcIndex });
+        this.scene.start('Game', { playerPosition: this.playerPosition, npcWasKilled: this.npcWasKilled, npcIndexToRemove: this.npcIndex, playerHP: this.playerHP });
         this.backgroundMusic.stop();
       });
     });
+
+  } else {
+    this.time.delayedCall(2000, () => {
+      this.cameras.main.fadeOut(1000, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('GameOver');
+        this.backgroundMusic.stop();
+      });
+    });
+   
   }
+
+}
 
   private createResultBox() {
     if (this.resultBox) {
@@ -287,8 +303,6 @@ export class CombatScene extends Phaser.Scene {
 
   private updateCombatLogUI() {
     const resultText = this.resultBox.getAt(1) as Phaser.GameObjects.Text;
-
-    this.sound.add('attack').play();
     const logText = ['Combat Log:', ...this.combatLogs.slice(-2)]
       .map((log) => `${log}`)
       .join('\n\n'); 
